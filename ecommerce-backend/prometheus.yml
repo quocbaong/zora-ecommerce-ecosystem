@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'zora-microservices'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: 
+        - 'gateway-service:8080'
+        - 'auth-service:8081'
+        - 'user-service:8082'
+        - 'product-service:8083'
+        - 'cart-service:8084'
+        - 'order-service:8085'
+        - 'payment-service:8086'
+        - 'notification-service:8087'

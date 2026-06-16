@@ -37,6 +37,19 @@ jobs:
           fi
         done
 
+    - name: Analyze with SonarCloud
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        for dir in *-service; do
+          if [ -d "$dir" ] && [ -f "$dir/pom.xml" ]; then
+            echo "Scanning $dir with SonarCloud..."
+            cd $dir
+            mvn sonar:sonar -Dsonar.projectKey=zora-$dir -Dsonar.organization=quocbaong -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            cd ..
+          fi
+        done
+
   # Giai đoạn 2: CD (Continuous Delivery) - Tự động tạo Docker Image
   build-and-push-docker:
     name: Build & Push Docker Images
