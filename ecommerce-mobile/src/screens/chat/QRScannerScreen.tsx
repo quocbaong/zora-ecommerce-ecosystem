@@ -35,7 +35,7 @@ export default function QRScannerScreen({ route, navigation }: any) {
     if (scanned || processing) return;
     setScanned(true);
 
-    const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app';
+    const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app';
     
     if (data.startsWith(`${appUrl}/qr/user/`)) {
       const userId = data.replace(`${appUrl}/qr/user/`, '');

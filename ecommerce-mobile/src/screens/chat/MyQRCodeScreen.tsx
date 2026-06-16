@@ -8,7 +8,7 @@ import { COLORS } from '../../constants';
 
 export default function MyQRCodeScreen({ navigation }: any) {
   const { user } = useAuthStore();
-  const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app';
+  const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app';
   const qrValue = `${appUrl}/qr/user/${user?.id}`;
 
   return (

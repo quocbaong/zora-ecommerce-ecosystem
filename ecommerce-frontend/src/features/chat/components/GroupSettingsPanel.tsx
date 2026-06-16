@@ -285,7 +285,7 @@ export default function GroupSettingsPanel({ group, myMember, onClose }: Props) 
                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
              ) : inviteToken ? (
                  <QRCode
-                    value={`${import.meta.env.VITE_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app'}/qr/group/${group.groupId}?token=${inviteToken}`}
+                    value={`${import.meta.env.VITE_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app'}/qr/group/${group.groupId}?token=${inviteToken}`}
                     size={200}
                     color="#000000"
                     bordered={false}
@@ -299,7 +299,7 @@ export default function GroupSettingsPanel({ group, myMember, onClose }: Props) 
              className="mt-6 w-full rounded-xl bg-orange-500 py-2.5 text-white font-semibold hover:bg-orange-600 transition-colors"
              onClick={() => {
                 if (inviteToken) {
-                   navigator.clipboard.writeText(`${import.meta.env.VITE_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app'}/qr/group/${group.groupId}?token=${inviteToken}`);
+                   navigator.clipboard.writeText(`${import.meta.env.VITE_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app'}/qr/group/${group.groupId}?token=${inviteToken}`);
                    toast.success('Đã sao chép liên kết nhóm');
                 }
              }}

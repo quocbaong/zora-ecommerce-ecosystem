@@ -50,7 +50,7 @@ export default function GroupQRCodeScreen({ route, navigation }: any) {
     );
   };
 
-  const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app';
+  const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app';
   const qrValue = inviteToken ? `${appUrl}/qr/group/${groupId}?token=${inviteToken}` : 'loading';
 
   return (
@@ -93,7 +93,7 @@ export default function GroupQRCodeScreen({ route, navigation }: any) {
                 onPress={() => {
                   if (inviteToken) {
                     import('expo-clipboard').then(({ setStringAsync }) => {
-                      const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app';
+                      const appUrl = process.env.EXPO_PUBLIC_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app';
                       setStringAsync(`${appUrl}/qr/group/${groupId}?token=${inviteToken}`);
                       Alert.alert("Thành công", "Đã sao chép liên kết nhóm");
                     });

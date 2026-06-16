@@ -70,7 +70,7 @@ export default function App() {
   const prefix = Linking.createURL('/');
   
   const linking = {
-    prefixes: [prefix, 'https://ecommerce-frontend-three-rosy.vercel.app'],
+    prefixes: [prefix, 'https://zora-ecommerce-ecosystem.vercel.app'],
     config: {
       screens: {
         Home: {

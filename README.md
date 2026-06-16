@@ -11,7 +11,7 @@ ZORA is a comprehensive, distributed e-commerce platform designed for high perfo
 ## 🌟 Deep-Dive Features
 
 ### 1. Robust Payment & Order Management
-- **Multi-Gateway Payment:** Integrated with **PayOS** and **Stripe** for diverse, secure checkout options.
+- **Multi-Gateway Payment:** Integrated with **PayOS** and **Stripe** and **Momo** for diverse, secure checkout options.
 - **Microservices Orchestration:** Fully decoupled services (Cart, Order, Payment, Notification) communicating asynchronously via Apache Kafka.
 - **Dispute & Refund Logic:** Automated status tracking with reliable rollback mechanisms.
 

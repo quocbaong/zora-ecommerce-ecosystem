@@ -47,7 +47,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "ecommerce-frontend-three-rosy.vercel.app",
+              "host": "zora-ecommerce-ecosystem.vercel.app",
               "pathPrefix": "/qr"
             }
           ],

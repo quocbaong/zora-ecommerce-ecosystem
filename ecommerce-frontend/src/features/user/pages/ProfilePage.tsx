@@ -724,7 +724,7 @@ export default function ProfilePage() {
           
           <div className="p-3 bg-white rounded-xl shadow-sm border border-gray-100">
              <QRCode
-                value={`${import.meta.env.VITE_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app'}/qr/user/${user?.id}`}
+                value={`${import.meta.env.VITE_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app'}/qr/user/${user?.id}`}
                 size={200}
                 color="#000000"
                 bordered={false}
@@ -734,7 +734,7 @@ export default function ProfilePage() {
           <button 
              className="mt-6 w-full rounded-xl bg-orange-500 py-2.5 text-white font-semibold hover:bg-orange-600 transition-colors"
              onClick={() => {
-                navigator.clipboard.writeText(`${import.meta.env.VITE_APP_URL || 'https://ecommerce-frontend-three-rosy.vercel.app'}/qr/user/${user?.id}`);
+                navigator.clipboard.writeText(`${import.meta.env.VITE_APP_URL || 'https://zora-ecommerce-ecosystem.vercel.app'}/qr/user/${user?.id}`);
                 toast.success('Đã sao chép liên kết');
              }}
           >
