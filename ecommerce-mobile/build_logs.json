@@ -1,0 +1,48 @@
+﻿{
+  "id": "1ebcc3b7-6a70-49f9-8435-d59f6465a8a3",
+  "status": "ERRORED",
+  "platform": "ANDROID",
+  "error": {
+    "errorCode": "EAS_BUILD_UNKNOWN_GRADLE_ERROR",
+    "message": "Gradle build failed with unknown error. See logs for the \"Run gradlew\" phase for more information."
+  },
+  "artifacts": {},
+  "fingerprint": {
+    "id": "019e7f8c-1f4f-79b3-8f37-6dc938ad290d",
+    "hash": "2235e64dfd56836dc7324765510bff70cb9188e2"
+  },
+  "initiatingActor": {
+    "id": "885237d6-537e-4138-9e98-d51f218102ba",
+    "displayName": "qubaon"
+  },
+  "logFiles": [
+    "https://storage.googleapis.com/eas-workflows-production/logs/a69cdb65-c83c-4dbe-9c5c-ee3cec96d776/1ebcc3b7-6a70-49f9-8435-d59f6465a8a3/2026-05-31T19%3A39%3A11Z-b3c64f6e-4076-4e9e-a470-4af837edfdae.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260531%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260531T201818Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=1dcb860f38a1686468db9f55923b7c9765d52a5e95a0a638730cd9bd7e8301fa9d7cb820b7d4095bce1024566cdfb436161f2d1e3fd6ffb111265803565ef7c185655fe215cd202ba149b788d6881fdfdb2e8ebf13aedd03a3599f548e6c948fa0633f8f1441c272d214ebff732a400b2e2443f9c1ddf96ce24c84be7141ea68d64c6a88037b6cc92b7c1f59d35cf531ed8e46152ef4c09da6d2ab4d40b67abc8cef7a6241c9b9c4f2dff4d1d385338ddb92894fa2ce1877f686cc83b96b94c6ce43f8f3473ea7a06e2c3df4d37c5f342511926da5337f868fa4136603b1687d1eec86ad2bcfed64a70b512c511dede2c777cd2e1e9ba1fca9aad2e034a9edf6"
+  ],
+  "project": {
+    "id": "a69cdb65-c83c-4dbe-9c5c-ee3cec96d776",
+    "name": "ecommerce-mobile",
+    "slug": "ecommerce-mobile",
+    "ownerAccount": {
+      "id": "1b3eacc5-0159-49da-88ef-921ad24b1670",
+      "name": "qubaon"
+    }
+  },
+  "distribution": "STORE",
+  "buildProfile": "production",
+  "sdkVersion": "54.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "5",
+  "gitCommitHash": "d5fd77c62289269ae2d056709bf62a27b9622ffb",
+  "gitCommitMessage": "Merge pull request #37 from quocbaong/feature/mobile-chat-features\n\nfeat: add FAQ menu panel for quick interaction in chat screen",
+  "priority": "NORMAL_PLUS",
+  "createdAt": "2026-05-31T19:39:09.942Z",
+  "updatedAt": "2026-05-31T19:42:38.830Z",
+  "completedAt": "2026-05-31T19:42:38.651Z",
+  "expirationDate": "2026-06-30T19:39:10.019Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 1254,
+    "buildQueueTime": 4885,
+    "buildDuration": 202570
+  }
+}

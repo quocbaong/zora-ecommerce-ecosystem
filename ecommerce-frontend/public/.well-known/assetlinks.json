@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.quocbao106.ecommercemobile",
+      "sha256_cert_fingerprints": [
+        "CE:0E:68:3C:83:E1:D5:28:D2:44:7E:24:62:3A:F3:E2:72:F9:FB:44:91:D1:82:19:51:BB:63:28:2D:AE:4C:32"
+      ]
+    }
+  }
+]

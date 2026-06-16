@@ -1,0 +1,10 @@
+CREATE DATABASE product_db;
+CREATE DATABASE order_db;
+CREATE DATABASE notification_db;
+CREATE DATABASE auth_db;
+CREATE DATABASE ai_db;
+CREATE DATABASE cart_db;
+CREATE DATABASE user_db;
+
+\c product_db
+CREATE EXTENSION IF NOT EXISTS unaccent;

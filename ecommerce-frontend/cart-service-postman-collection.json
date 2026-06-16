@@ -1,0 +1,238 @@
+{
+  "info": {
+    "_postman_id": "cart-service-collection",
+    "name": "Cart Service API",
+    "description": "E-Commerce Platform - Cart Service APIs\n\n⚠️ IMPORTANT: Update variables in Collection Settings before testing:\n- user_id: Your actual user ID\n- product_id: ID of product to add\n- variant_id: Product variant ID (optional)\n- cart_item_id: Cart item ID (get from Get Cart response)\n- product_price: Price of the product\n\nAll requests require X-User-Id header (injected by Gateway in production)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Cart",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{user_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/cart",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "cart"]
+        },
+        "description": "Lấy giỏ hàng hiện tại của người dùng\n\nHeaders required:\n- X-User-Id: ID người dùng (inject từ Gateway)"
+      },
+      "response": []
+    },
+    {
+      "name": "Add Cart Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{user_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"productId\": \"{{product_id}}\",\n  \"variantId\": \"{{variant_id}}\",\n  \"quantity\": 2,\n  \"price\": {{product_price}}\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/cart/items",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "cart", "items"]
+        },
+        "description": "Thêm một sản phẩm vào giỏ hàng\n\nRequired fields:\n- productId: ID của sản phẩm\n- price: Giá sản phẩm\n\nOptional fields:\n- variantId: ID biến thể (màu sắc, kích cỡ)\n- quantity: Số lượng (mặc định 1, tối thiểu 1)\n\nHeaders required:\n- X-User-Id: ID người dùng (inject từ Gateway)"
+      },
+      "response": []
+    },
+    {
+      "name": "Add Cart Item (Alternative)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{user_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"productId\": \"{{product_id}}\",\n  \"variantId\": null,\n  \"quantity\": 1,\n  \"price\": {{product_price}}\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/cart/add",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "cart", "add"]
+        },
+        "description": "Thêm sản phẩm vào giỏ (endpoint thay thế)\n\nRequired fields:\n- productId: ID của sản phẩm\n- price: Giá sản phẩm\n\nOptional fields:\n- variantId: ID biến thể (màu sắc, kích cỡ)\n- quantity: Số lượng (mặc định 1, tối thiểu 1)\n\nHeaders required:\n- X-User-Id: ID người dùng (inject từ Gateway)"
+      },
+      "response": []
+    },
+    {
+      "name": "Update Cart Item Quantity",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{user_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/cart/items/{{cart_item_id}}?quantity=5",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "cart", "items", "{{cart_item_id}}"],
+          "query": [
+            {
+              "key": "quantity",
+              "value": "5"
+            }
+          ]
+        },
+        "description": "Cập nhật số lượng sản phẩm trong giỏ hàng\n\nQuery parameters:\n- quantity: Số lượng mới (tối thiểu 1)\n\nHeaders required:\n- X-User-Id: ID người dùng (inject từ Gateway)"
+      },
+      "response": []
+    },
+    {
+      "name": "Remove Cart Item",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{user_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/cart/items/{{cart_item_id}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "cart", "items", "{{cart_item_id}}"]
+        },
+        "description": "Xóa một mục khỏi giỏ hàng\n\nPath parameters:\n- item_id: ID của cart item cần xóa\n\nHeaders required:\n- X-User-Id: ID người dùng (inject từ Gateway)"
+      },
+      "response": []
+    },
+    {
+      "name": "Clear Cart",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{user_id}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/cart",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "cart"]
+        },
+        "description": "Xóa toàn bộ giỏ hàng hiện tại\n\nHeaders required:\n- X-User-Id: ID người dùng (inject từ Gateway)"
+      },
+      "response": []
+    }
+    {
+      "name": "Get Cart (Missing Header - Error Test)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/cart",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "cart"]
+        },
+        "description": "Test error response khi thiếu X-User-Id header\n\nExpected: 200 OK with error message:\n{\n  \"success\": false,\n  \"error\": \"MISSING_USER_ID\",\n  \"message\": \"X-User-Id header is required\"\n}"
+      },
+      "response": []
+    }
+    {
+      "key": "user_id",
+      "value": "user-xyz-123",
+      "type": "string"
+    },
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "product_id",
+      "value": "prod-123",
+      "type": "string"
+    },
+    {
+      "key": "variant_id",
+      "value": "variant-456",
+      "type": "string"
+    },
+    {
+      "key": "cart_item_id",
+      "value": "item-123",
+      "type": "string"
+    },
+    {
+      "key": "product_price",
+      "value": "150000.0",
+      "type": "string"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: order-service
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 100MB
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${DB_NAME:order_db}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:root}
+    driver-class-name: org.postgresql.Driver
+
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+services:
+  cart-url: http://${CART_SERVICE_URL:cart-service:8084}
+  product-url: http://${PRODUCT_SERVICE_URL:product-service:8083}
+  user-url: http://${USER_SERVICE_URL:user-service:8082}
+  payment-url: http://${PAYMENT_SERVICE_URL:payment-service:8086}
+
+ghn:
+  base-url: ${GHN_BASE_URL:https://dev-online-gateway.ghn.vn}
+  token: ${GHN_TOKEN:c518-c4bb-11ea-be3a-f636b1deefb9}
+  shop-id: ${GHN_SHOP_ID:885}
+
+aws:
+  access-key: ${AWS_ACCESS_KEY_ID:123}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:123}
+  region: ${AWS_REGION:ap-southeast-1}
+  s3:
+    bucket: ${AWS_S3_BUCKET:ecommerce-pool-zora}
+
+resilience4j:
+  # Thứ tự aspect: retry (giá trị nhỏ = bên trong) chạy TRƯỚC, circuit breaker (giá trị lớn = bên ngoài)
+  # bọc ngoài → retry các lỗi tạm thời, hết số lần mới tới fallback của circuit breaker.
+  retry:
+    retry-aspect-order: 1
+    instances:
+      productService:
+        max-attempts: 3
+        wait-duration: 3s
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+      cartService:
+        max-attempts: 3
+        wait-duration: 3s
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+  circuitbreaker:
+    circuit-breaker-aspect-order: 2
+    instances:
+      productService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      cartService:
+        slidingWindowSize: 5
+        failureRateThreshold: 60
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+
+logging:
+  level:
+    org.springframework: INFO

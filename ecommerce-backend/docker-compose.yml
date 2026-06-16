@@ -1,0 +1,266 @@
+version: "3.8"
+
+x-default-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  postgres:
+    <<: *default-logging
+    image: pgvector/pgvector:pg15
+    container_name: ecommerce-postgres
+    command:
+      - postgres
+      - -c
+      - max_wal_size=512MB
+      - -c
+      - min_wal_size=80MB
+      - -c
+      - wal_keep_size=128MB
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+
+  redis:
+    <<: *default-logging
+    image: redis:7
+    container_name: ecommerce-redis
+    networks:
+      - app-network
+    ports:
+      - "6379:6379"
+
+  zookeeper:
+    <<: *default-logging
+    image: confluentinc/cp-zookeeper:7.3.0
+    networks:
+      - app-network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL: 1
+      ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT: 3
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  kafka:
+    <<: *default-logging
+    image: confluentinc/cp-kafka:7.3.0
+    networks:
+      - app-network
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 72
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_LOG_SEGMENT_BYTES: 268435456
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+    healthcheck:
+      test:
+        ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  gateway-service:
+    <<: *default-logging
+    build: ./gateway-service
+    networks:
+      - app-network
+    ports:
+      - "8080:8000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis
+      - AUTH_SERVICE_URL=auth-service:8081
+      - USER_SERVICE_URL=user-service:8082
+      - PRODUCT_SERVICE_URL=product-service:8083
+    depends_on:
+      - auth-service
+      - user-service
+      - product-service
+      - redis
+
+  auth-service:
+    <<: *default-logging
+    build: ./auth-service
+    container_name: auth-service
+    env_file:
+      - .env
+    networks:
+      - app-network
+    ports:
+      - "8081:8081"
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - DB_NAME=user_db
+
+  user-service:
+    <<: *default-logging
+    build: ./user-service
+    container_name: user-service
+    env_file:
+      - .env
+    networks:
+      - app-network
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8082:8082"
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - DB_NAME=user_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=ap-southeast-1
+
+  product-service:
+    <<: *default-logging
+    build: ./product-service
+    container_name: product-service
+    networks:
+      - app-network
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - KAFKA_SERVER=kafka:29092
+      - DB_NAME=product_db
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=ap-southeast-1
+
+  cart-service:
+    <<: *default-logging
+    build: ./cart-service
+    env_file:
+      - .env
+    networks:
+      - app-network
+    ports:
+      - "8084:8084"
+    environment:
+      - DB_NAME=cart_db
+
+  order-service:
+    <<: *default-logging
+    build: ./order-service
+    env_file:
+      - .env
+    environment:
+      - DB_NAME=order_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks:
+      - app-network
+    ports:
+      - "8085:8085"
+
+  payment-service:
+    <<: *default-logging
+    build: ./payment-service
+    env_file:
+      - .env
+    networks:
+      - app-network
+    ports:
+      - "8086:8086"
+    environment:
+      - ORDER_SERVICE_URL=http://order-service:8085
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - PAYOS_CLIENT_ID=${PAYOS_CLIENT_ID}
+      - PAYOS_API_KEY=${PAYOS_API_KEY}
+      - PAYOS_CHECKSUM_KEY=${PAYOS_CHECKSUM_KEY}
+
+  notification-service:
+    <<: *default-logging
+    build: ./notification-service
+    env_file:
+      - .env
+    networks:
+      - app-network
+    ports:
+      - "8087:8087"
+
+  chat-service:
+    <<: *default-logging
+    build: ./chat-service
+    container_name: chat-service
+    networks:
+      - app-network
+    ports:
+      - "8088:8088"
+    env_file:
+      - .env
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=ap-southeast-1
+      - DYNAMODB_TABLE_CONVERSATIONS=chat_conversations
+      - DYNAMODB_TABLE_MESSAGES=chat_messages
+      - DYNAMODB_TABLE_GROUPS=chat_groups
+      - DYNAMODB_TABLE_GROUP_MEMBERS=chat_group_members
+      - DYNAMODB_TABLE_GROUP_MESSAGES=chat_group_messages
+      - DYNAMODB_TABLE_GROUP_PINS=chat_group_pins
+      - DYNAMODB_TABLE_POLLS=chat_polls
+      - DYNAMODB_TABLE_POLL_VOTES=chat_poll_votes
+      - DYNAMODB_TABLE_REMINDERS=chat_reminders
+      - S3_BUCKET_CHAT=ecommerce-chat-service-zora
+      - KAFKA_SERVER=kafka:29092
+      - PORT=8088
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  ai-service:
+    <<: *default-logging
+    build: ./ai-service
+    env_file:
+      - .env
+    networks:
+      - app-network
+    ports:
+      - "8089:8089"
+    depends_on:
+      - postgres
+      - redis
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

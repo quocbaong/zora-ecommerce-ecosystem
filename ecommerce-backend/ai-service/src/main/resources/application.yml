@@ -1,0 +1,71 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: ai-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${AI_DB_NAME:ai_db}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:root}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
+  autoconfigure:
+    exclude: org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+  ai:
+    openai:
+      api-key: ${GROQ_API_KEY}
+      base-url: https://api.groq.com/openai
+      chat:
+        options:
+          model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+          temperature: 0.7
+          max-tokens: 2048
+    google:
+      genai:
+        embedding:
+          api-key: ${GEMINI_API_KEY:}
+          text:
+            options:
+              model: gemini-embedding-001
+    retry:
+      max-attempts: 1
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: NONE
+        distance-type: COSINE_DISTANCE
+        dimensions: 3072
+
+# Internal service URLs
+services:
+  order-url: http://${ORDER_SERVICE_URL:order-service:8085}
+  product-url: http://${PRODUCT_SERVICE_URL:product-service:8083}
+  cart-url: http://${CART_SERVICE_URL:cart-service:8084}
+
+# AI feature flags and limits
+ai:
+  enabled: ${AI_CHAT_ENABLED:true}
+  history-enabled: ${AI_HISTORY_ENABLED:true}
+  tool-call-enabled: ${AI_TOOL_CALL_ENABLED:true}
+  max-history-messages: 10
+  max-message-length: 2000
+  max-requests-per-day-per-user: ${AI_DAILY_LIMIT:50}
+
+logging:
+  level:
+    com.ecommerce.ai_service: INFO
+    org.springframework.ai: WARN
+    org.springframework.web: WARN

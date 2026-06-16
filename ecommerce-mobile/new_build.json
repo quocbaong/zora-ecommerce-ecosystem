@@ -1,0 +1,48 @@
+﻿{
+  "id": "73e539f6-eb8b-4cde-b0e1-aa5a85019821",
+  "status": "ERRORED",
+  "platform": "ANDROID",
+  "error": {
+    "errorCode": "EAS_BUILD_UNKNOWN_GRADLE_ERROR",
+    "message": "Gradle build failed with unknown error. See logs for the \"Run gradlew\" phase for more information."
+  },
+  "artifacts": {},
+  "fingerprint": {
+    "id": "019e7fb7-12fe-7fe3-b8bb-8c31454f1038",
+    "hash": "16162b33aa2f2a5994b3989763a06c5e3ef8fcfc"
+  },
+  "initiatingActor": {
+    "id": "885237d6-537e-4138-9e98-d51f218102ba",
+    "displayName": "qubaon"
+  },
+  "logFiles": [
+    "https://storage.googleapis.com/eas-workflows-production/logs/a69cdb65-c83c-4dbe-9c5c-ee3cec96d776/73e539f6-eb8b-4cde-b0e1-aa5a85019821/2026-05-31T20%3A26%3A06Z-8924068c-ade2-4dab-9e98-07dc4e29d9aa.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260531%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260531T203827Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=6d4b992f7e0f1589d577f3ade2f3bc3135354b67b4a4fea7cd6ee436ad8f076287539a51ffddf878b0c073b54837c8931fd3c53877fa5883501d203e45ce34e2316cdd0fe572434db575c2e87c7af5d859d811a9ab46a656b4bcb211f67799fe13a562fcc4d448ebeb944912c1abeb5a674e24c5a508b1861e11a3ae7fafc4d8ea21a23059f8f12a7301af511be1e000520595a85d8e9c0f47648b73fcd9cc6f759ef85d87343fc10b6948d089848659be3c1171a7d9302c2e764f5a02951b8eed4ed053a6570de055dc083023612fea37344122cedbea60e936265fced91c4c7eec924343683975bba789300a52bdb35f7a00fa8edd302a257eefe5e4b6b920"
+  ],
+  "project": {
+    "id": "a69cdb65-c83c-4dbe-9c5c-ee3cec96d776",
+    "name": "ecommerce-mobile",
+    "slug": "ecommerce-mobile",
+    "ownerAccount": {
+      "id": "1b3eacc5-0159-49da-88ef-921ad24b1670",
+      "name": "qubaon"
+    }
+  },
+  "distribution": "STORE",
+  "buildProfile": "production",
+  "sdkVersion": "54.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "6",
+  "gitCommitHash": "615f24be35b57668e35ba891646bea87874f061e",
+  "gitCommitMessage": "fix: disable new arch, update eas build config for production apk",
+  "priority": "NORMAL",
+  "createdAt": "2026-05-31T20:26:04.859Z",
+  "updatedAt": "2026-05-31T20:30:19.523Z",
+  "completedAt": "2026-05-31T20:30:19.305Z",
+  "expirationDate": "2026-06-30T20:26:04.913Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 761,
+    "buildQueueTime": 25708,
+    "buildDuration": 227977
+  }
+}

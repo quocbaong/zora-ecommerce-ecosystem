@@ -1,0 +1,21 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: payment-service
+
+stripe:
+  secret:
+    key: ${STRIPE_SECRET_KEY:sk_test_dummy}
+  webhook:
+    secret: ${STRIPE_WEBHOOK_SECRET:whsec_dummy}
+
+services:
+  order-url: ${ORDER_SERVICE_URL:http://localhost:8085}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+payos:
+  client-id: ${PAYOS_CLIENT_ID:}
+  api-key: ${PAYOS_API_KEY:}
+  checksum-key: ${PAYOS_CHECKSUM_KEY:}

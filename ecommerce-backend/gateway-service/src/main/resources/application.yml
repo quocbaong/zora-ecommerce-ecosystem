@@ -1,0 +1,148 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: gateway-service
+  codec:
+    max-in-memory-size: 10MB
+    
+  # Redis Configuration for Rate Limiting
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  cloud:
+    gateway:
+      x-forwarded:
+        prefix-enabled: false
+      # CORS Configuration (Centralized here for all services)
+      # Note: This handles CORS for ALL requests through the gateway at /api/*
+      # For direct service access (e.g., http://localhost:8087/notifications),
+      # CORS must be configured at the service level (@CrossOrigin or CorsConfig bean)
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 10
+            redis-rate-limiter.burstCapacity: 20
+            redis-rate-limiter.requestedTokens: 1
+            key-resolver: "#{@ipKeyResolver}"
+
+      routes:
+        - id: auth-service
+          uri: http://${AUTH_SERVICE_URL:auth-service:8081}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - RewritePath=/api/auth(?<segment>/?.*), /auth$\{segment}
+
+        - id: user-service
+          uri: http://${USER_SERVICE_URL:user-service:8082}
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - RewritePath=/api/users(?<segment>/?.*), /users$\{segment}
+
+        - id: product-service
+          uri: http://${PRODUCT_SERVICE_URL:product-service:8083}
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - RewritePath=/api/products(?<segment>/?.*), /products$\{segment}
+            - RemoveRequestHeader=X-Forwarded-Prefix
+
+        - id: cart-service
+          uri: http://${CART_SERVICE_URL:cart-service:8084}
+          predicates:
+            - Path=/api/cart/**
+          filters:
+            - RewritePath=/api/cart(?<segment>/?.*), /cart$\{segment}
+
+        - id: order-service
+          uri: http://${ORDER_SERVICE_URL:order-service:8085}
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - RewritePath=/api/orders(?<segment>/?.*), /orders$\{segment}
+
+        - id: shipping-service
+          uri: http://${ORDER_SERVICE_URL:order-service:8085}
+          predicates:
+            - Path=/api/shipping/**
+          filters:
+            - RewritePath=/api/shipping(?<segment>/?.*), /shipping$\{segment}
+
+        - id: ads-service
+          uri: http://${PRODUCT_SERVICE_URL:product-service:8083}
+          predicates:
+            - Path=/api/ads/**
+          filters:
+            - RewritePath=/api/ads(?<segment>/?.*), /ads$\{segment}
+
+        - id: payment-service
+          uri: http://${PAYMENT_SERVICE_URL:payment-service:8086}
+          predicates:
+            - Path=/api/payments/**
+          filters:
+            - RewritePath=/api/payments(?<segment>/?.*), /payments$\{segment}
+
+        - id: notification-service
+          uri: http://${NOTIFICATION_SERVICE_URL:notification-service:8087}
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - RewritePath=/api/notifications(?<segment>/?.*), /notifications$\{segment}
+
+        - id: chat-service
+          uri: http://${CHAT_SERVICE_URL:chat-service:8088}
+          predicates:
+            - Path=/api/chat/**
+          filters:
+            - RewritePath=/api/chat(?<segment>/?.*), /chat$\{segment}
+
+        - id: ai-service
+          uri: http://${AI_SERVICE_URL:ai-service:8089}
+          predicates:
+            - Path=/api/ai/**
+          filters:
+            - RewritePath=/api/ai(?<segment>/?.*), /ai$\{segment}
+            - SetResponseHeader=X-Accel-Buffering, no
+          metadata:
+            response-timeout: 120000
+            connect-timeout: 5000
+
+        - id: chat-websocket
+          uri: http://${CHAT_SERVICE_URL:chat-service:8088}
+          predicates:
+            - Path=/socket.io/**
+
+        - id: notification-websocket
+          uri: http://${NOTIFICATION_SERVICE_URL:notification-service:8087}
+          predicates:
+            - Path=/ws/**
+
+# Logging Configuration
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+
+# Custom JWT Secret Key
+jwt:
+  secret: ${JWT_SECRET:your_super_secret_jwt_key_here}

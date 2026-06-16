@@ -1,0 +1,20 @@
+package com.ecommerce.product.kafka.event;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.math.BigDecimal;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class ProductCreatedEvent {
+    private String productId;
+    private String name;
+    private BigDecimal price;
+    private String sellerId;
+
+    // Thêm các thông tin cơ bản mà Notification Service cần để soạn Email
+}

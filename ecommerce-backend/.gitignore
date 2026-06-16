@@ -1,0 +1,47 @@
+
+# Ignore Microsoft Word documents
+*.docx
+# Ignore Markdown files
+*.md
+!**/rag/*.md
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Build files
+dist/
+build/
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.template
+!.env.prod.example
+
+# Logs
+logs/
+*.log
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+target/

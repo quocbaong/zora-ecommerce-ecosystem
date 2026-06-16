@@ -1,0 +1,176 @@
+{
+  "info": {
+    "_postman_id": "checkout-api-collection",
+    "name": "E-Commerce Checkout API",
+    "description": "Complete checkout flow with items and shipping address",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Order with Items & Shipping",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"user-12345\",\n  \"totalPrice\": 40970000,\n  \"items\": [\n    {\n      \"productId\": \"prod-iphone-15\",\n      \"productName\": \"iPhone 15 Pro\",\n      \"productImage\": \"https://example.com/iphone-15-pro.jpg\",\n      \"quantity\": 1,\n      \"price\": 29990000,\n      \"variantId\": \"variant-color-space-black\"\n    },\n    {\n      \"productId\": \"prod-airpods\",\n      \"productName\": \"AirPods Pro Gen 2\",\n      \"productImage\": \"https://example.com/airpods-pro.jpg\",\n      \"quantity\": 2,\n      \"price\": 5490000,\n      \"variantId\": null\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Nguyễn Văn A\",\n    \"phoneNumber\": \"0912345678\",\n    \"street\": \"123 Đường Đinh Tiên Hoàng\",\n    \"ward\": \"Bến Thành\",\n    \"district\": \"Quận 1\",\n    \"province\": \"TP. Hồ Chí Minh\",\n    \"postalCode\": \"700000\",\n    \"isDefault\": true\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/orders",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "orders"]
+        },
+        "description": "Create a complete order with items and shipping address"
+      },
+      "response": []
+    },
+    {
+      "name": "Create Order - Simple Test",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"test-user-001\",\n  \"totalPrice\": 9980000,\n  \"items\": [\n    {\n      \"productId\": \"prod-001\",\n      \"productName\": \"Sample Product\",\n      \"productImage\": \"https://example.com/product.jpg\",\n      \"quantity\": 1,\n      \"price\": 9980000\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Test User\",\n    \"phoneNumber\": \"0987654321\",\n    \"street\": \"456 Test Street\",\n    \"ward\": \"Test Ward\",\n    \"district\": \"Test District\",\n    \"province\": \"Test Province\",\n    \"postalCode\": \"100000\"\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/orders",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "orders"]
+        },
+        "description": "Simple test order with minimal data"
+      },
+      "response": []
+    },
+    {
+      "name": "Get All Orders",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/orders",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "orders"]
+        },
+        "description": "Retrieve all orders"
+      },
+      "response": []
+    },
+    {
+      "name": "Get Order by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/orders/{{orderId}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "orders", "{{orderId}}"]
+        },
+        "description": "Get specific order details with items and shipping address"
+      },
+      "response": []
+    },
+    {
+      "name": "Update Order",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"user-12345\",\n  \"totalPrice\": 35000000,\n  \"items\": [\n    {\n      \"productId\": \"prod-iphone-15\",\n      \"productName\": \"iPhone 15 Pro\",\n      \"productImage\": \"https://example.com/iphone-15-pro.jpg\",\n      \"quantity\": 1,\n      \"price\": 29990000\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Nguyễn Văn B\",\n    \"phoneNumber\": \"0912345679\",\n    \"street\": \"456 Nguyễn Huệ\",\n    \"ward\": \"Bến Thành\",\n    \"district\": \"Quận 1\",\n    \"province\": \"TP. Hồ Chí Minh\",\n    \"postalCode\": \"700001\"\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/orders/{{orderId}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "orders", "{{orderId}}"]
+        },
+        "description": "Update order details"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Order",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/orders/{{orderId}}",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "orders", "{{orderId}}"]
+        },
+        "description": "Delete an order"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": "your-jwt-token-here",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "paste-order-id-from-create-response",
+      "type": "string"
+    }
+  ]
+}

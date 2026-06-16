@@ -1,0 +1,25 @@
+# Reverse proxy + auto-HTTPS (Let's Encrypt) cho backend.
+# CADDY_DOMAIN = <elastic-ip>.sslip.io  (vd: 13-228-45-67.sslip.io)
+# Caddy tự bật WebSocket upgrade cho reverse_proxy nên không cần header thủ công.
+{
+	email {$ACME_EMAIL}
+}
+
+{$CADDY_DOMAIN} {
+	encode gzip
+
+	# Chat realtime (Socket.IO) → chat-service
+	handle /socket.io/* {
+		reverse_proxy chat-service:8088
+	}
+
+	# Push notification (STOMP/SockJS) → notification-service
+	handle /ws/* {
+		reverse_proxy notification-service:8087
+	}
+
+	# Còn lại (/api/*, ...) → API Gateway (nghe nội bộ cổng 8000)
+	handle {
+		reverse_proxy gateway-service:8000
+	}
+}

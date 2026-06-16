@@ -1,0 +1,40 @@
+name: Tự động Cập Nhật App OTA
+on:
+  push:
+    branches:
+      - main  # Mỗi khi có code đẩy lên nhánh main thì sẽ chạy
+
+jobs:
+  update:
+    name: Chạy lệnh EAS Update
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Checkout code
+        uses: actions/checkout@v4
+
+      - name: 2. Cài đặt Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 3. Kết nối với Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 4. Cài đặt thư viện NPM
+        run: npm install
+
+      - name: 5. Phát hành bản cập nhật (Bơm thẳng xuống điện thoại)
+        env:
+          EXPO_NOTIFICATION_URL: ${{ secrets.EXPO_NOTIFICATION_URL }}
+          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
+          EXPO_PUBLIC_APP_URL: ${{ secrets.EXPO_PUBLIC_APP_URL }}
+          EXPO_PUBLIC_GIPHY_API_KEY: ${{ secrets.EXPO_PUBLIC_GIPHY_API_KEY }}
+          EXPO_PUBLIC_OTP_LENGTH: ${{ secrets.EXPO_PUBLIC_OTP_LENGTH }}
+          EXPO_PUBLIC_S3_BUCKET: ${{ secrets.EXPO_PUBLIC_S3_BUCKET }}
+          EXPO_PUBLIC_SOCKET_URL: ${{ secrets.EXPO_PUBLIC_SOCKET_URL }}
+        run: |
+          eas update --branch production --message "Cập nhật tự động từ GitHub: ${{ github.event.head_commit.message }}"

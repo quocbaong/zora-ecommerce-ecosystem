@@ -1,0 +1,636 @@
+Tech assumption:
+Gateway: Spring Cloud Gateway Auth: Spring Security + JWT DB: PostgreSQL Cache: Redis Event: Kafka Image: AWS S3
+
+1️⃣ API Gateway
+Base URL
+/api
+Routes
+/api/auth/** → auth-service /api/users/** → user-service /api/products/** → product-service /api/cart/** → cart-service /api/orders/** → order-service /api/payments/** → payment-service /api/notifications/** → notification-service
+Gateway làm:
+JWT verification rate limiting logging CORS
+
+2️⃣ Auth Service
+Roles
+USER SELLER ADMIN
+Register
+POST /auth/register
+body
+{  "email":"user@gmail.com",  "password":"123456",  "name":"Hieu" }
+
+Login
+POST /auth/login
+response
+{  "accessToken":"jwt",  "refreshToken":"token",  "role":"USER" }
+
+Refresh token
+POST /auth/refresh
+
+Logout
+POST /auth/logout
+
+Verify email
+POST /auth/verify-email
+
+Change password
+PUT /auth/password
+
+3️⃣ User Service
+Database
+users addresses
+
+Get profile
+GET /users/me
+
+Update profile
+PUT /users/me
+body
+{  "name":"Hieu",  "phone":"090000000" }
+
+Upload avatar
+POST /users/avatar
+(upload S3)
+
+Add address
+POST /users/address
+{  "receiverName":"Hieu",  "phone":"09000000",  "province":"HCM",  "district":"District 1",  "street":"123 abc",  "default":true }
+
+Get addresses
+GET /users/address
+
+Update address
+PUT /users/address/{id}
+
+Delete address
+DELETE /users/address/{id}
+
+4️⃣ Product Service
+Database
+products categories product_images product_variants product_reviews
+
+Create product (SELLER)
+POST /products
+body
+{  "name":"Iphone 15",  "description":"Apple phone",  "price":1000,  "stock":50,  "categoryId":1,  "discount":10,  "verified":true }
+
+Upload product images
+POST /products/{id}/images
+(upload S3)
+
+Create variant
+POST /products/{id}/variants
+{  "name":"Color Red",  "price":1050,  "stock":10 }
+
+Update product
+PUT /products/{id}
+
+Delete product
+DELETE /products/{id}
+
+Get product list
+GET /products
+query
+?page &size &category &keyword &minPrice &maxPrice &rating
+
+Product detail
+GET /products/{id}
+
+Product search
+GET /products/search
+?q=iphone
+
+Product review
+POST /products/{id}/reviews
+{  "rating":5,  "review":"good product" }
+
+Get reviews
+GET /products/{id}/reviews
+
+5️⃣ Cart Service
+Database
+carts cart_items
+
+Get cart
+GET /cart
+
+Add item
+POST /cart/items
+{  "productId":1,  "variantId":2,  "quantity":1 }
+
+Update quantity
+PUT /cart/items/{id}
+
+Remove item
+DELETE /cart/items/{id}
+
+Clear cart
+DELETE /cart
+
+6️⃣ Order Service
+Database
+orders order_items order_status_history
+Order status
+PENDING CONFIRMED PAID SHIPPED DELIVERED CANCELLED REFUNDED
+
+Create order
+POST /orders
+body
+{  "addressId":1,  "paymentMethod":"COD" }
+Flow:
+cart → order_items
+
+Get my orders
+GET /orders/my
+
+Get order detail
+GET /orders/{id}
+
+Cancel order
+POST /orders/{id}/cancel
+
+Seller update shipping
+PUT /orders/{id}/ship
+
+Admin update status
+PUT /orders/{id}/status
+
+7️⃣ Payment Service
+Payment dễ nhất và free:
+Stripe test mode
+(hoặc COD đơn giản nhất)
+
+Database
+payments transactions
+
+Create payment
+POST /payments
+body
+{  "orderId":1,  "method":"COD" }
+
+Payment callback
+POST /payments/callback
+
+Get payment status
+GET /payments/{orderId}
+
+8️⃣ Notification Service
+Database
+notifications
+
+Send notification
+POST /notifications
+body
+{  "userId":1,  "type":"ORDER_CREATED",  "message":"Your order created" }
+
+Get notifications
+GET /notifications
+
+Mark as read
+PUT /notifications/{id}/read
+
+9️⃣ Event Flow (Kafka)
+Events
+order_created payment_success order_shipped product_updated
+Example
+Order Service    ↓ Kafka (order_created)    ↓ Notification Service    ↓ Push + Email
+
+🔟 Realtime notification
+Tech
+WebSocket
+Flow
+Order Created ↓ Notification Service ↓ WebSocket push to user
+
+1️⃣1️⃣ Database services
+auth_db user_db product_db cart_db order_db payment_db notification_db
+Auth + User có thể chung:
+user_db
+
+1️⃣2️⃣ S3 usage
+Lưu
+product images user avatars review images
+
+1️⃣3️⃣ Tổng số API
+Approx:
+Auth: 6 User: 7 Product: 10 Cart: 5 Order: 6 Payment: 3 Notification: 3
+Total:
+40+ APIs
+2️⃣ Flow đặt hàng chuẩn Shopee/Amazon (rất quan trọng) 3️⃣ Cách các service gọi nhau đúng microservice architecture
+DB sử dụng: PostgreSQL
+
+1️⃣ Auth + User Service Database
+Database: user_db
+users
+users ----- id (PK) email (unique) password_hash role (USER | SELLER | ADMIN) is_email_verified created_at updated_at
+
+user_profiles
+user_profiles ------------- id (PK) user_id (FK -> users.id) full_name phone avatar_url date_of_birth created_at updated_at
+
+addresses
+addresses --------- id (PK) user_id (FK -> users.id) receiver_name phone province district ward street is_default created_at
+
+refresh_tokens
+refresh_tokens -------------- id (PK) user_id (FK -> users.id) token expires_at created_at
+
+2️⃣ Product Service Database
+Database: product_db
+categories
+categories ---------- id (PK) name parent_id created_at
+
+products
+products -------- id (PK) seller_id name description price stock category_id rating_avg rating_count discount_percent verified (Shopee Mall style) status (ACTIVE / DISABLED) created_at updated_at
+
+product_images
+product_images -------------- id (PK) product_id image_url is_main created_at
+(images lưu ở S3)
+
+product_variants
+product_variants ---------------- id (PK) product_id name price stock sku created_at
+Ví dụ:
+Color Red Size M
+
+product_reviews
+product_reviews --------------- id (PK) product_id user_id rating review_text created_at
+
+review_images
+review_images ------------- id (PK) review_id image_url
+
+3️⃣ Cart Service Database
+Database: cart_db
+carts
+carts ----- id (PK) user_id created_at updated_at
+
+cart_items
+cart_items ---------- id (PK) cart_id product_id variant_id quantity price created_at
+
+4️⃣ Order Service Database
+Database: order_db
+orders
+orders ------ id (PK) user_id total_price shipping_fee status address_snapshot payment_method created_at updated_at
+address_snapshot = JSON lưu địa chỉ lúc order.
+
+order_items
+order_items ----------- id (PK) order_id product_id variant_id seller_id product_name price quantity created_at
+
+order_status_history
+order_status_history -------------------- id (PK) order_id status changed_by created_at
+
+Order status enum
+PENDING CONFIRMED PAID SHIPPED DELIVERED CANCELLED REFUNDED
+
+5️⃣ Payment Service Database
+Database: payment_db
+payments
+payments -------- id (PK) order_id user_id amount method status created_at
+
+payment_transactions
+payment_transactions -------------------- id (PK) payment_id transaction_code gateway_response status created_at
+method
+COD STRIPE
+
+6️⃣ Notification Service Database
+Database: notification_db
+notifications
+notifications ------------- id (PK) user_id type title message is_read created_at
+type
+ORDER_CREATED PAYMENT_SUCCESS ORDER_SHIPPED PROMOTION
+
+7️⃣ Redis Data
+Redis dùng cho:
+product cache cart session jwt blacklist rate limit
+
+8️⃣ S3 Storage
+S3 buckets
+ecommerce-product-images ecommerce-user-avatars ecommerce-review-images
+
+9️⃣ Event topics (Kafka)
+order_created payment_success order_shipped product_updated
+
+🔟 Tổng số bảng
+users user_profiles addresses refresh_tokens  categories products product_images product_variants product_reviews review_images  carts cart_items  orders order_items order_status_history  payments payment_transactions  notifications
+Total:
+18 tables
+
+1️⃣1️⃣ ERD tổng quan
+User  │  ├── UserProfile  ├── Address  │  ├── Cart  │     └── CartItems  │  └── Orders        ├── OrderItems        └── OrderStatusHistory  Product  ├── ProductImages  ├── ProductVariants  └── ProductReviews        └── ReviewImages  Order  └── Payment  User  └── Notifications
+1️⃣ Flow đặt hàng chuẩn (Cart → Order → Payment)
+Bước 1: User thêm sản phẩm vào cart
+Client gọi
+POST /cart/items
+Cart Service lưu:
+cart_items
+Ví dụ:
+cart_id = 1 product_id = 10 variant_id = 3 quantity = 2
+
+2️⃣ User checkout
+Client gọi
+POST /orders
+body
+{  "addressId":1,  "paymentMethod":"COD" }
+
+3️⃣ Order Service lấy dữ liệu từ Cart Service
+Order Service gọi Cart Service
+GET /cart
+Cart trả về
+{  "items":[   {    "productId":1,    "variantId":2,    "quantity":2   }  ] }
+
+4️⃣ Order Service verify product
+Order Service gọi Product Service
+GET /products/{id}
+Kiểm tra:
+price stock status
+
+5️⃣ Order Service tạo order
+Insert
+orders order_items
+status
+PENDING
+
+6️⃣ Publish event
+Order Service gửi event
+order_created
+qua Kafka.
+Event
+{  "orderId":101,  "userId":1,  "items":[] }
+
+7️⃣ Inventory update
+Product Service nhận event
+order_created
+giảm stock
+stock - quantity
+
+8️⃣ Payment
+Client gọi
+POST /payments
+body
+{  "orderId":101,  "method":"COD" }
+
+9️⃣ Payment success
+Payment Service update
+payments
+status
+SUCCESS
+
+Sau đó gửi event
+payment_success
+
+🔟 Order Service update status
+Order Service nhận event
+payment_success
+Update
+orders.status = PAID
+
+1️⃣1️⃣ Notification Service
+Nhận event
+order_created payment_success
+Gửi
+email push notification
+
+1️⃣2️⃣ Flow tổng thể
+User  │  ▼ Cart Service  │  ▼ Order Service  │  ▼ Product Service (check stock)  │  ▼ Create Order  │  ▼ Kafka Event (order_created)  │  ▼ Inventory Update  │  ▼ Payment Service  │  ▼ Kafka Event (payment_success)  │  ▼ Order Service update status  │  ▼ Notification Service
+
+2️⃣ Service-to-Service Communication
+Trong microservice có 2 cách giao tiếp chính
+1 Sync (REST) 2 Async (Event)
+
+1️⃣ Sync Communication
+Dùng khi cần response ngay.
+Ví dụ:
+Order → Product Order → Cart
+Example
+Order Service gọi Product Service
+GET /products/{id}
+Java example
+@RestTemplate Product product = restTemplate.getForObject( "http://product-service/products/" + id, Product.class );
+
+2️⃣ Async Communication
+Dùng khi không cần response ngay.
+Ví dụ:
+order_created payment_success
+dùng
+Kafka
+Example event
+{  "event":"ORDER_CREATED",  "orderId":101 }
+
+3️⃣ Khi nào dùng Sync
+Dùng khi cần:
+validate data check stock get user info
+Ví dụ
+Order → Product Order → User
+
+4️⃣ Khi nào dùng Async
+Dùng khi:
+notification inventory update analytics email
+Ví dụ
+Order → Notification Payment → Order
+
+5️⃣ Quy tắc rất quan trọng (90% sinh viên làm sai)
+❌ Sai
+Service A → Service B → Service C → Service D
+Chain dài → dễ crash.
+
+✅ Đúng
+Service A    │    ▼ Kafka Event    │  ┌─┴────────────┐  ▼              ▼ Service B      Service C
+
+6️⃣ Ví dụ đúng trong hệ thống của bạn
+Order Service    │    ▼ Kafka (order_created)    │  ┌─┴───────────────┐  ▼                 ▼ Notification      Product Service           Service
+
+7️⃣ Communication của từng service
+Service
+Communication
+Order → Cart
+REST
+Order → Product
+REST
+Order → Notification
+Kafka
+Payment → Order
+Kafka
+Payment → Notification
+Kafka
+
+8️⃣ Production best practice
+Service chỉ nên:
+sync ≤ 2 service
+còn lại dùng
+event
+
+9️⃣ Kiến trúc cuối của project bạn
+Client  │  ▼ Gateway  │  ├── Auth  ├── User  ├── Product  ├── Cart  ├── Order  ├── Payment  └── Notification
+Communication
+REST + Kafka
+
+⭐ Đây là flow giống hệ thống thật
+Có:
+cart order payment inventory notification
+1️⃣ Tech Stack toàn hệ thống
+Backend
+Java 17 Spring Boot Spring Security Spring Cloud Gateway Spring Data JPA Hibernate JWT Authentication
+
+Database
+PostgreSQL
+mỗi service database riêng
+user_db product_db cart_db order_db payment_db notification_db
+
+Infrastructure
+Redis (cache + cart) Kafka (event communication) Docker AWS S3 (image storage)
+
+Frontend
+ReactJS Axios WebSocket (notification)
+
+2️⃣ Microservices trong project
+Team làm 8 services
+1 gateway-service 2 auth-service 3 user-service 4 product-service 5 cart-service 6 order-service 7 payment-service 8 notification-service
+
+3️⃣ Phân chia công việc team (5 người)
+Member 1
+Gateway Service Auth Service
+
+Member 2
+User Service Notification Service
+
+Member 3
+Product Service
+
+Member 4
+Cart Service
+
+Member 5
+Order Service Payment Service
+
+4️⃣ Quy tắc thiết kế API (rất quan trọng)
+API phải dùng RESTful
+Ví dụ
+GET /products GET /products/{id} POST /products PUT /products/{id} DELETE /products/{id}
+
+Naming rule
+plural noun
+Ví dụ
+/products /orders /users
+
+Response format chung
+Tất cả API trả về dạng
+{  "success": true,  "data": {},  "message": "success" }
+
+Error format
+{  "success": false,  "error": "PRODUCT_NOT_FOUND" }
+
+5️⃣ API khi có Gateway
+Frontend không gọi service trực tiếp
+chỉ gọi
+http://api-domain/api
+Ví dụ
+POST /api/auth/login GET /api/products POST /api/cart/items POST /api/orders
+
+Gateway routing
+/api/auth/** → auth-service /api/users/** → user-service /api/products/** → product-service /api/cart/** → cart-service /api/orders/** → order-service /api/payments/** → payment-service /api/notifications/** → notification-service
+
+6️⃣ Authentication rule
+JWT token
+Header
+Authorization: Bearer <token>
+
+Protected APIs
+cart order payment profile
+Public APIs
+product list product detail login register
+
+7️⃣ Role Authorization
+Roles
+USER SELLER ADMIN
+
+USER
+add cart create order review product
+
+SELLER
+create product update product manage products
+
+ADMIN
+manage users manage products manage orders
+
+8️⃣ Service Communication
+Có 2 loại:
+Sync
+REST API
+Ví dụ
+Order → Product Order → Cart
+
+Async
+Kafka
+Ví dụ
+order_created payment_success
+
+9️⃣ Event Flow
+Order Service    │    ▼ Kafka (order_created)    │  ┌─┴──────────────┐  ▼                ▼ Product         Notification Service         Service
+
+🔟 Image Upload
+Images upload vào
+AWS S3
+Các service dùng:
+Product User avatar Review images
+
+1️⃣1️⃣ Git Workflow
+Branch model
+main develop feature/*
+Ví dụ
+feature/product-api feature/cart-service
+
+Pull request rule
+review bởi 1 member khác
+
+1️⃣2️⃣ Code Structure (Spring Boot)
+controller service repository entity dto config
+Ví dụ
+product-service  ├ controller  ├ service  ├ repository  ├ entity  ├ dto  └ config
+
+1️⃣3️⃣ DTO rule
+Không return entity trực tiếp.
+Ví dụ
+ProductResponse ProductRequest
+
+1️⃣4️⃣ Logging
+Tất cả service dùng
+SLF4J
+Log quan trọng
+login order created payment error
+
+1️⃣5️⃣ Exception Handling
+Dùng
+GlobalExceptionHandler
+Response error chung
+400 BAD REQUEST 401 UNAUTHORIZED 403 FORBIDDEN 404 NOT FOUND 500 INTERNAL ERROR
+
+1️⃣6️⃣ Testing
+Tools
+Postman Swagger
+Mỗi service phải có
+OpenAPI / Swagger
+
+1️⃣7️⃣ Docker
+Mỗi service có
+Dockerfile
+Chạy bằng
+docker-compose
+
+1️⃣8️⃣ Naming convention
+Table
+snake_case
+Ví dụ
+order_items product_images
+
+Java
+camelCase
+
+1️⃣9️⃣ Important Rules
+Không được
+service gọi database của service khác
+Ví dụ sai
+Order → product_db
+Phải
+Order → Product API
+
+2️⃣0️⃣ Checklist trước khi push code
+Member phải check
+API chạy được database migration ok swagger update code format đúng
+
+⭐ Kiến trúc cuối
+Client  │  ▼ Gateway  │  ├── Auth Service  ├── User Service  ├── Product Service  ├── Cart Service  ├── Order Service  ├── Payment Service  └── Notification Service
+

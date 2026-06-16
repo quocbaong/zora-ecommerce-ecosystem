@@ -1,0 +1,323 @@
+# Production stack — chạy trên 1 EC2.
+# Khác docker-compose.yml (dev): image kéo từ GHCR (không build), chỉ Caddy expose 80/443,
+# mọi service khác chỉ truy cập trong app-network.
+#
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Cần file .env cùng thư mục (xem .env.prod.example).
+
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # ───────────────────────── Hạ tầng ─────────────────────────
+  postgres:
+    <<: *default-logging
+    image: pgvector/pgvector:pg15
+    container_name: ecommerce-postgres
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - max_wal_size=512MB
+      - -c
+      - min_wal_size=80MB
+      - -c
+      - wal_keep_size=128MB
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks: [app-network]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  redis:
+    <<: *default-logging
+    image: redis:7
+    container_name: ecommerce-redis
+    restart: unless-stopped
+    networks: [app-network]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    <<: *default-logging
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: ecommerce-zookeeper
+    restart: unless-stopped
+    networks: [app-network]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_AUTOPURGE_PURGE_INTERVAL: 1
+      ZOOKEEPER_AUTOPURGE_SNAP_RETAIN_COUNT: 3
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  kafka:
+    <<: *default-logging
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: ecommerce-kafka
+    restart: unless-stopped
+    networks: [app-network]
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 72
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_LOG_SEGMENT_BYTES: 268435456
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ───────────────────────── Reverse proxy + TLS ─────────────────────────
+  caddy:
+    <<: *default-logging
+    image: caddy:2-alpine
+    container_name: ecommerce-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [app-network]
+    depends_on:
+      - gateway-service
+      - chat-service
+      - notification-service
+
+  # ───────────────────────── App services (GHCR) ─────────────────────────
+  gateway-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/gateway-service:${TAG:-latest}
+    container_name: gateway-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - REDIS_HOST=redis
+      - AUTH_SERVICE_URL=auth-service:8081
+      - USER_SERVICE_URL=user-service:8082
+      - PRODUCT_SERVICE_URL=product-service:8083
+    networks: [app-network]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  auth-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/auth-service:${TAG:-latest}
+    container_name: auth-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - DB_NAME=user_db
+    networks: [app-network]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  user-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/user-service:${TAG:-latest}
+    container_name: user-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - DB_NAME=user_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-ap-southeast-1}
+    networks: [app-network]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  product-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/product-service:${TAG:-latest}
+    container_name: product-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - KAFKA_SERVER=kafka:29092
+      - DB_NAME=product_db
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-ap-southeast-1}
+    networks: [app-network]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  cart-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/cart-service:${TAG:-latest}
+    container_name: cart-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_HOST=postgres
+      - DB_NAME=cart_db
+    networks: [app-network]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  order-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/order-service:${TAG:-latest}
+    container_name: order-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_HOST=postgres
+      - DB_NAME=order_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks: [app-network]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  payment-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/payment-service:${TAG:-latest}
+    container_name: payment-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - ORDER_SERVICE_URL=http://order-service:8085
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - PAYOS_CLIENT_ID=${PAYOS_CLIENT_ID:-}
+      - PAYOS_API_KEY=${PAYOS_API_KEY:-}
+      - PAYOS_CHECKSUM_KEY=${PAYOS_CHECKSUM_KEY:-}
+    networks: [app-network]
+    depends_on:
+      - order-service
+
+  notification-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/notification-service:${TAG:-latest}
+    container_name: notification-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_HOST=postgres
+      - DB_NAME=notification_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    networks: [app-network]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  ai-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/ai-service:${TAG:-latest}
+    container_name: ai-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - AI_DB_NAME=ai_db
+    networks: [app-network]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  chat-service:
+    <<: *default-logging
+    image: ${IMAGE_PREFIX:-ghcr.io/buimanhhieu}/chat-service:${TAG:-latest}
+    container_name: chat-service
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - NODE_ENV=production
+      - PORT=8088
+      - JWT_SECRET=${JWT_SECRET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-ap-southeast-1}
+      - KAFKA_SERVER=kafka:29092
+      - S3_BUCKET_CHAT=${S3_BUCKET_CHAT:-ecommerce-chat-service-zora}
+    networks: [app-network]
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  kafka_data:
+  zookeeper_data:
+  zookeeper_log:
+  caddy_data:
+  caddy_config:
