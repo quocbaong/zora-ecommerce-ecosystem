@@ -37,31 +37,7 @@ ZORA is a comprehensive, distributed e-commerce platform designed for high perfo
 
 ## 🏗 System Architecture (Monorepo)
 
-```mermaid
-graph TD
-    Client_Web[🌐 Web Storefront<br>React/Next.js] -->|REST API| API_Gateway
-    Client_Mobile[📱 Mobile App<br>React Native/Expo] -->|REST API| API_Gateway
-    
-    Client_Web <-->|Socket/WebRTC| Chat_Service
-    Client_Mobile <-->|Socket/WebRTC| Chat_Service
-
-    API_Gateway((API Gateway<br>Port 8080)) --> Microservices
-
-    subgraph Microservices [Java Spring Boot Services]
-        Auth[Auth Service]
-        User[User Service]
-        Product[Product Service]
-        Order[Order Service]
-        Payment[Payment Service<br>PayOS/Stripe]
-        AI[AI Service]
-    end
-
-    Microservices -.->|Events| Kafka((Apache Kafka))
-    Kafka -.-> Notification[Notification Service]
-    
-    Microservices --> DB_Main[(PostgreSQL + pgvector)]
-    Microservices --> Redis[(Redis Cache)]
-```
+![ZORA System Architecture](./ecommerce-frontend/public/architecture.png)
 
 ### Workspace Breakdown
 - 📂 **`/ecommerce-backend`**: Core backend infrastructure containing all Java Spring Boot microservices, Kafka setup, and Docker configuration files.
