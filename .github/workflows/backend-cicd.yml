@@ -26,11 +26,16 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    - name: Make Maven Wrapper Executable
-      run: chmod +x mvnw
-
-    - name: Compile and Run Unit Tests
-      run: ./mvnw clean test
+    - name: Compile and Run Unit Tests for all Microservices
+      run: |
+        for dir in *-service; do
+          if [ -d "$dir" ] && [ -f "$dir/pom.xml" ]; then
+            echo "Testing $dir..."
+            cd $dir
+            mvn clean test
+            cd ..
+          fi
+        done
 
   # Giai đoạn 2: CD (Continuous Delivery) - Tự động tạo Docker Image
   build-and-push-docker:
