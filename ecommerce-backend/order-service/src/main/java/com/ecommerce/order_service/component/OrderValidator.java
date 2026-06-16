@@ -48,16 +48,17 @@ public class OrderValidator {
 
         if (response.getBody() != null && !Boolean.TRUE.equals(response.getBody().get("available"))) {
             Object outList = response.getBody().get("outOfStockItems");
-            StringBuilder msg = new StringBuilder("Một số sản phẩm không đủ tồn kho:");
+            StringBuilder msg = new StringBuilder("Rất tiếc, sản phẩm ");
             if (outList instanceof List<?> list) {
-                for (Object o : list) {
+                for (int i = 0; i < list.size(); i++) {
+                    Object o = list.get(i);
                     if (o instanceof Map<?, ?> m) {
-                        msg.append(" [").append(m.get("productName"))
-                                .append(" — yêu cầu ").append(m.get("requested"))
-                                .append(", còn ").append(m.get("available")).append("]");
+                        msg.append("'").append(m.get("productName")).append("'");
+                        if (i < list.size() - 1) msg.append(", ");
                     }
                 }
             }
+            msg.append(" đã hết hàng hoặc không đủ số lượng. Vui lòng kiểm tra lại giỏ hàng!");
             throw new CustomException(msg.toString(), HttpStatus.BAD_REQUEST);
         }
         Object ratesObj = response.getBody().get("commissionRates");
@@ -73,6 +74,9 @@ public class OrderValidator {
     }
 
     public Map<String, Double> validateStockFallback(OrderRequest request, Throwable t) {
+        if (t instanceof CustomException) {
+            throw (CustomException) t; // Rethrow business exceptions (e.g. Out of Stock)
+        }
         log.warn("product-service không khả dụng cho stock check (circuit open), tiếp tục đặt hàng: {}",
                 t.getMessage());
         return new HashMap<>();
@@ -91,6 +95,9 @@ public class OrderValidator {
     }
 
     public void decrementStockFallback(List<OrderItemRequest> items, Throwable t) {
+        if (t instanceof CustomException) {
+            throw (CustomException) t;
+        }
         log.error("Decrement stock thất bại (circuit open), cần reconcile thủ công. Lý do: {}",
                 t.getMessage());
     }

@@ -515,7 +515,9 @@ public class ProductServiceImpl implements ProductService {
 
         for (com.ecommerce.product.dto.request.StockCheckRequest.StockCheckItem item : request.getItems()) {
             if (item.getVariantId() != null && !item.getVariantId().isEmpty()) {
-                productVariantRepository.findById(item.getVariantId()).ifPresent(variant -> {
+                java.util.Optional<com.ecommerce.product.entity.ProductVariant> variantOpt = productVariantRepository.findById(item.getVariantId());
+                if (variantOpt.isPresent()) {
+                    com.ecommerce.product.entity.ProductVariant variant = variantOpt.get();
                     if (variant.getStock() < item.getQuantity()) {
                         outOfStock.add(com.ecommerce.product.dto.response.StockCheckResponse.OutOfStockItem.builder()
                                 .productId(item.getProductId())
@@ -531,9 +533,19 @@ public class ProductServiceImpl implements ProductService {
                                 .map(com.ecommerce.product.entity.CommissionRate::getRate).orElse(5.0);
                         commissionRates.put(item.getProductId(), rate);
                     }
-                });
+                } else {
+                    outOfStock.add(com.ecommerce.product.dto.response.StockCheckResponse.OutOfStockItem.builder()
+                            .productId(item.getProductId())
+                            .variantId(item.getVariantId())
+                            .productName("Sản phẩm không còn tồn tại")
+                            .requested(item.getQuantity())
+                            .available(0)
+                            .build());
+                }
             } else {
-                productRepository.findById(item.getProductId()).ifPresent(product -> {
+                java.util.Optional<com.ecommerce.product.entity.Product> productOpt = productRepository.findById(item.getProductId());
+                if (productOpt.isPresent()) {
+                    com.ecommerce.product.entity.Product product = productOpt.get();
                     if (product.getStock() < item.getQuantity()) {
                         outOfStock.add(com.ecommerce.product.dto.response.StockCheckResponse.OutOfStockItem.builder()
                                 .productId(item.getProductId())
@@ -549,7 +561,15 @@ public class ProductServiceImpl implements ProductService {
                                 .map(com.ecommerce.product.entity.CommissionRate::getRate).orElse(5.0);
                         commissionRates.put(item.getProductId(), rate);
                     }
-                });
+                } else {
+                    outOfStock.add(com.ecommerce.product.dto.response.StockCheckResponse.OutOfStockItem.builder()
+                            .productId(item.getProductId())
+                            .variantId(null)
+                            .productName("Sản phẩm không còn tồn tại")
+                            .requested(item.getQuantity())
+                            .available(0)
+                            .build());
+                }
             }
         }
 

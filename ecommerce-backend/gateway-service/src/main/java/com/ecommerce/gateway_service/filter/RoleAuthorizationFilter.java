@@ -21,6 +21,7 @@ public class RoleAuthorizationFilter implements GlobalFilter, Ordered {
         String path = request.getURI().getPath();
         String method = request.getMethod().name();
         boolean isProductReviewWrite = path.matches("/api/products/[^/]+/reviews") && method.equals("POST");
+        boolean isCheckStock = path.equals("/api/products/check-stock") && method.equals("POST");
         boolean isCategoryAttributeWrite = path.matches("/api/products/categories/[^/]+/attributes(/[^/]+)?")
                 && (method.equals("POST") || method.equals("PUT") || method.equals("DELETE"));
 
@@ -38,7 +39,7 @@ public class RoleAuthorizationFilter implements GlobalFilter, Ordered {
 
         // Only SELLER and ADMIN can create/update/delete products
         if (path.startsWith("/api/products") && (method.equals("POST") || method.equals("PUT") || method.equals("DELETE"))) {
-            if (isProductReviewWrite) {
+            if (isProductReviewWrite || isCheckStock) {
                 return chain.filter(exchange);
             }
             // GET /api/products/categories is public, but POST/PUT/DELETE require SELLER or ADMIN

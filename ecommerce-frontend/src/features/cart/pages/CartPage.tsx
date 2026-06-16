@@ -10,7 +10,7 @@ import type { CartItem as LocalCartItem } from '@/stores/cartStore';
 import EmptyState from '@/components/common/EmptyState';
 import { useQuery } from '@tanstack/react-query';
 import { userService } from '@/features/user/services/userService';
-
+import { productService } from '@/features/product/services/productService';
 function SellerName({ sellerId }: { sellerId: string }) {
   const { data } = useQuery({
     queryKey: ['seller-profile', sellerId],
@@ -80,6 +80,30 @@ export default function CartPage() {
 
   const groups = useMemo(() => groupBySeller(cartItems), [cartItems]);
   const allIds = useMemo(() => cartItems.map(getItemId), [cartItems]);
+
+  const { data: stockData } = useQuery({
+    queryKey: ['cart-stock', cartItems.map(i => getItemId(i)).join(',')],
+    queryFn: async () => {
+      if (cartItems.length === 0) return null;
+      const items = cartItems.map(item => {
+        const productId = (item as CartItemResponse).productId ?? (item as LocalCartItem).productId;
+        const variantId = (item as CartItemResponse).variantId ?? (item as LocalCartItem).variantId ?? null;
+        return { productId, variantId, quantity: item.quantity };
+      });
+      return productService.checkStock({ items });
+    },
+    enabled: cartItems.length > 0,
+    refetchInterval: 10000,
+  });
+
+  const getStockStatus = useCallback((item: AnyItem) => {
+    if (!stockData) return null;
+    const productId = (item as CartItemResponse).productId ?? (item as LocalCartItem).productId;
+    const variantId = (item as CartItemResponse).variantId ?? (item as LocalCartItem).variantId ?? null;
+    return stockData.outOfStockItems.find(
+      (o) => o.productId === productId && (o.variantId ?? null) === (variantId ?? null)
+    );
+  }, [stockData]);
 
   // Selected item IDs — load from localStorage initially if present, else empty
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
@@ -188,6 +212,29 @@ export default function CartPage() {
     }
   }, [allIds.join(','), seenKey, userId, cartItems]);
 
+  // Clean up selectedIds if they become out of stock
+  useEffect(() => {
+    if (!stockData || selectedIds.size === 0) return;
+
+    let hasChanges = false;
+    const nextSelected = new Set(selectedIds);
+
+    for (const id of selectedIds) {
+      const item = cartItems.find(i => getItemId(i) === id);
+      if (item) {
+        const status = getStockStatus(item);
+        if (status && status.available === 0) {
+          nextSelected.delete(id);
+          hasChanges = true;
+        }
+      }
+    }
+
+    if (hasChanges) {
+      setSelectedIds(nextSelected);
+    }
+  }, [stockData, cartItems, getStockStatus]);
+
   // Persist manual selections whenever they change
   useEffect(() => {
     if (allIds.length > 0) {
@@ -195,20 +242,48 @@ export default function CartPage() {
     }
   }, [selectedIds, selectedKey, allIds.length]);
 
-  const isAllSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
-  const isGroupSelected = (g: SellerGroup) => g.items.every((i) => selectedIds.has(getItemId(i)));
+  const selectableIds = useMemo(() => {
+    return cartItems
+      .filter((i) => {
+        const stockStatus = getStockStatus(i);
+        return !(stockStatus && stockStatus.available === 0);
+      })
+      .map(getItemId);
+  }, [cartItems, getStockStatus]);
+
+  const isAllSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+  const isGroupSelected = (g: SellerGroup) => {
+    const groupSelectable = g.items.filter(i => {
+      const st = getStockStatus(i);
+      return !(st && st.available === 0);
+    });
+    return groupSelectable.length > 0 && groupSelectable.every((i) => selectedIds.has(getItemId(i)));
+  };
   const isGroupIndeterminate = (g: SellerGroup) =>
     g.items.some((i) => selectedIds.has(getItemId(i))) && !isGroupSelected(g);
 
   const toggleAll = () => {
-    if (isAllSelected) setSelectedIds(new Set());
-    else setSelectedIds(new Set(allIds));
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      const next = new Set(selectedIds);
+      selectableIds.forEach(id => next.add(id));
+      setSelectedIds(next);
+    }
   };
 
   const toggleGroup = (g: SellerGroup) => {
     const next = new Set(selectedIds);
-    if (isGroupSelected(g)) g.items.forEach((i) => next.delete(getItemId(i)));
-    else g.items.forEach((i) => next.add(getItemId(i)));
+    const groupSelectable = g.items.filter(i => {
+      const st = getStockStatus(i);
+      return !(st && st.available === 0);
+    });
+    
+    if (isGroupSelected(g)) {
+      groupSelectable.forEach((i) => next.delete(getItemId(i)));
+    } else {
+      groupSelectable.forEach((i) => next.add(getItemId(i)));
+    }
     setSelectedIds(next);
   };
 
@@ -250,8 +325,15 @@ export default function CartPage() {
   );
 
   const handleCheckout = () => {
-    if (selectedItems.length === 0) return;
-    navigate('/checkout', { state: { selectedItems } });
+    const validItems = selectedItems.filter(i => {
+      const st = getStockStatus(i);
+      return !(st && st.available === 0);
+    });
+    if (validItems.length === 0) {
+      toast.error('Không có sản phẩm nào hợp lệ để thanh toán!');
+      return;
+    }
+    navigate('/checkout', { state: { selectedItems: validItems } });
   };
 
   const handleClearAll = () => {
@@ -374,24 +456,33 @@ export default function CartPage() {
               const qty = item.quantity;
               const checked = selectedIds.has(id);
               const isServer = isServerItem(item);
+              
+              const stockStatus = getStockStatus(item);
+              const isOutOfStock = stockStatus && stockStatus.available === 0;
+              const isNotEnough = stockStatus && stockStatus.available > 0 && stockStatus.available < qty;
+              
+              // If it's out of stock, uncheck it automatically so it can't be checked out
+              if (isOutOfStock && checked) {
+                setTimeout(() => toggleItem(id), 0);
+              }
 
               return (
                 <div
                   key={id}
-                  className={`flex items-center gap-3 px-4 py-4 border-b border-gray-50 last:border-0 transition-colors ${checked ? 'bg-orange-50/20' : ''}`}
+                  className={`flex flex-col md:flex-row md:items-center gap-3 px-4 py-4 border-b border-gray-50 last:border-0 transition-colors ${checked ? 'bg-orange-50/20' : ''} ${isOutOfStock ? 'bg-gray-50/50' : ''}`}
                 >
-                  {/* Checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleItem(id)}
-                    className="w-4 h-4 accent-orange-500 cursor-pointer shrink-0"
-                  />
+                  {/* Left part: Checkbox + Image + Name */}
+                  <div className="flex items-start md:items-center gap-3 flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={checked && !isOutOfStock}
+                      disabled={isOutOfStock}
+                      onChange={() => toggleItem(id)}
+                      className={`w-4 h-4 cursor-pointer shrink-0 mt-1 md:mt-0 ${isOutOfStock ? 'accent-gray-300 opacity-50 cursor-not-allowed' : 'accent-orange-500'}`}
+                    />
 
-                  {/* Image + Name */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Link to={`/products/${(item as CartItemResponse).productId ?? id}`} className="shrink-0">
-                      <div className="w-20 h-20 rounded border border-gray-200 overflow-hidden bg-gray-100">
+                    <Link to={`/products/${(item as CartItemResponse).productId ?? id}`} className={`shrink-0 ${isOutOfStock ? 'cursor-not-allowed pointer-events-none' : ''}`}>
+                      <div className={`w-20 h-20 rounded border border-gray-200 overflow-hidden relative ${isOutOfStock ? 'bg-gray-200 grayscale opacity-80' : 'bg-gray-100'}`}>
                         {image ? (
                           <img src={image} alt={name} className="w-full h-full object-cover" loading="lazy" />
                         ) : (
@@ -399,63 +490,88 @@ export default function CartPage() {
                             <ShoppingBag className="w-6 h-6 text-gray-300" />
                           </div>
                         )}
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <div className="bg-gray-800/80 text-white text-[10px] font-bold uppercase px-2 py-1 rounded-sm border border-gray-600/50 backdrop-blur-sm">
+                              Hết hàng
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </Link>
                     <div className="min-w-0 flex flex-col gap-0.5">
                       <Link
                         to={`/products/${(item as CartItemResponse).productId ?? id}`}
-                        className="text-sm text-gray-800 hover:text-orange-500 line-clamp-2 transition-colors"
+                        className={`text-sm line-clamp-2 transition-colors ${isOutOfStock ? 'text-gray-400 cursor-not-allowed pointer-events-none' : 'text-gray-800 hover:text-orange-500'}`}
                       >
                         {name}
                       </Link>
                       {variantName && (
-                        <span className="text-xs text-gray-500">Phân loại: {variantName}</span>
+                        <span className={`text-xs ${isOutOfStock ? 'text-gray-400' : 'text-gray-500'}`}>Phân loại: {variantName}</span>
+                      )}
+                      {isOutOfStock && (
+                        <span className="text-xs text-red-500 bg-red-50 inline-block px-1.5 py-0.5 rounded border border-red-100 mt-1 w-fit">Sản phẩm đã hết hàng</span>
+                      )}
+                      {isNotEnough && (
+                        <span className="text-xs text-orange-600 bg-orange-50 inline-block px-1.5 py-0.5 rounded border border-orange-100 mt-1 w-fit">Chỉ còn {stockStatus.available} sản phẩm. Vui lòng giảm số lượng.</span>
                       )}
                     </div>
                   </div>
 
-                  {/* Unit price */}
-                  <div className="w-28 text-center text-sm text-gray-500 shrink-0 hidden md:block">
-                    {formatPrice(price)}
-                  </div>
+                  {/* Right part: Price, Qty, Subtotal, Delete (wrapped for mobile) */}
+                  <div className="flex items-center justify-between pl-7 md:pl-0 w-full md:w-auto">
+                    {/* Unit price */}
+                    <div className={`w-28 text-center text-sm shrink-0 hidden md:block ${isOutOfStock ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {formatPrice(price)}
+                    </div>
 
-                  {/* Qty controls */}
-                  <div className="w-32 flex items-center justify-center shrink-0">
-                    <div className="flex items-center border border-gray-300 rounded">
+                    {/* Qty controls */}
+                    <div className="w-32 flex justify-center shrink-0">
+                      {!isOutOfStock ? (
+                        <div className="flex items-center border border-gray-300 rounded">
+                          <button
+                            onClick={() => handleQuantityChange(id, qty - 1, isServer)}
+                            disabled={qty <= 1 || updateItem.isPending}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 disabled:opacity-40 text-gray-600"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-9 text-center text-sm font-medium border-x border-gray-300 h-8 flex items-center justify-center">
+                            {qty}
+                          </span>
+                          <button
+                            onClick={() => handleQuantityChange(id, qty + 1, isServer)}
+                            disabled={updateItem.isPending}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 disabled:opacity-40 text-gray-600"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-sm font-medium text-gray-400 bg-gray-100 px-3 py-1 rounded">
+                          Hết
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Subtotal */}
+                    <div className="w-24 text-center shrink-0">
+                      {!isOutOfStock && (
+                        <span className="text-sm font-semibold text-orange-500">{formatPrice(price * qty)}</span>
+                      )}
+                    </div>
+
+                    {/* Delete */}
+                    <div className="w-16 flex items-center justify-center shrink-0">
                       <button
-                        onClick={() => handleQuantityChange(id, qty - 1, isServer)}
-                        disabled={qty <= 1 || updateItem.isPending}
-                        className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 disabled:opacity-40 text-gray-600"
+                        onClick={() => handleRemove(id, isServer)}
+                        disabled={removeItem.isPending}
+                        className="text-gray-400 hover:text-red-500 transition-colors text-sm p-2 hover:bg-red-50 rounded-full"
+                        title="Xóa khỏi giỏ hàng"
                       >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="w-9 text-center text-sm font-medium border-x border-gray-300 h-8 flex items-center justify-center">
-                        {qty}
-                      </span>
-                      <button
-                        onClick={() => handleQuantityChange(id, qty + 1, isServer)}
-                        disabled={updateItem.isPending}
-                        className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 disabled:opacity-40 text-gray-600"
-                      >
-                        <Plus className="w-3 h-3" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-
-                  {/* Subtotal */}
-                  <div className="w-24 text-center shrink-0">
-                    <span className="text-sm font-semibold text-orange-500">{formatPrice(price * qty)}</span>
-                  </div>
-
-                  {/* Delete */}
-                  <div className="w-16 flex items-center justify-center shrink-0">
-                    <button
-                      onClick={() => handleRemove(id, isServer)}
-                      disabled={removeItem.isPending}
-                      className="text-gray-400 hover:text-red-500 transition-colors text-sm"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               );
