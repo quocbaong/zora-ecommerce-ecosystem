@@ -49,6 +49,7 @@ public class OrderServiceImpl implements OrderService {
     private final RestTemplate restTemplate;
     private final VoucherService voucherService;
     private final com.ecommerce.order_service.shipping.ShippingFeeCalculator shippingFeeCalculator;
+    private final org.redisson.api.RedissonClient redissonClient;
 
     @Value("${services.product-url}")
     private String productServiceUrl;
@@ -61,69 +62,105 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderResponse create(OrderRequest request, String userId) {
-        // 1. Validate stock — HTTP call outside any DB transaction (Circuit Breaker)
-        Map<String, Double> commissionRates = orderValidator.validateStock(request);
+        List<org.redisson.api.RLock> acquiredLocks = new ArrayList<>();
+        try {
+            // Sort product IDs to prevent deadlocks when multiple concurrent requests lock different products
+            List<String> sortedProductIds = request.getItems().stream()
+                    .map(com.ecommerce.order_service.dto.request.OrderItemRequest::getProductId)
+                    .distinct()
+                    .sorted()
+                    .toList();
 
-        // 2. Pure calculations — no I/O (chỉ tính subtotal items, fee/discount cộng sau)
-        double subtotal = orderCalculator.calculateTotal(request.getItems(), 0.0, 0.0);
-        ShippingAddress address = orderCalculator.buildAddress(request.getShippingAddress());
+            // Acquire locks for all products in the order
+            for (String productId : sortedProductIds) {
+                org.redisson.api.RLock lock = redissonClient.getLock("lock:product:" + productId);
+                try {
+                    // Try to acquire lock within 3 seconds, auto-release after 15 seconds
+                    boolean isLocked = lock.tryLock(3, 15, java.util.concurrent.TimeUnit.SECONDS);
+                    if (isLocked) {
+                        acquiredLocks.add(lock);
+                    } else {
+                        log.warn("Failed to acquire lock for product {}", productId);
+                        throw new CustomException("Sản phẩm đang được người khác thanh toán, vui lòng thử lại sau!", HttpStatus.CONFLICT);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new CustomException("Hệ thống bận, vui lòng thử lại!", HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
 
-        // 2b. Apply voucher if any
-        double discount = 0.0;
-        String voucherId = null;
-        if (request.getVoucherId() != null && !request.getVoucherId().isBlank()) {
-            var voucher = voucherService.findById(request.getVoucherId());
-            if (voucher != null) {
-                String sellerId = voucher.getSellerId();
-                java.math.BigDecimal sellerSubtotal = request.getItems().stream()
-                        .filter(i -> sellerId.equals(i.getSellerId()))
-                        .map(i -> java.math.BigDecimal.valueOf(i.getPrice()).multiply(java.math.BigDecimal.valueOf(i.getQuantity())))
-                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-                java.math.BigDecimal d = voucherService.computeDiscount(voucher.getId(), sellerId, userId, sellerSubtotal);
-                if (d.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                    discount = d.doubleValue();
-                    voucherId = voucher.getId();
+            // 1. Validate stock — HTTP call outside any DB transaction (Circuit Breaker)
+            Map<String, Double> commissionRates = orderValidator.validateStock(request);
+
+            // 2. Pure calculations — no I/O (chỉ tính subtotal items, fee/discount cộng sau)
+            double subtotal = orderCalculator.calculateTotal(request.getItems(), 0.0, 0.0);
+            ShippingAddress address = orderCalculator.buildAddress(request.getShippingAddress());
+
+            // 2b. Apply voucher if any
+            double discount = 0.0;
+            String voucherId = null;
+            if (request.getVoucherId() != null && !request.getVoucherId().isBlank()) {
+                var voucher = voucherService.findById(request.getVoucherId());
+                if (voucher != null) {
+                    String sellerId = voucher.getSellerId();
+                    java.math.BigDecimal sellerSubtotal = request.getItems().stream()
+                            .filter(i -> sellerId.equals(i.getSellerId()))
+                            .map(i -> java.math.BigDecimal.valueOf(i.getPrice()).multiply(java.math.BigDecimal.valueOf(i.getQuantity())))
+                            .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                    java.math.BigDecimal d = voucherService.computeDiscount(voucher.getId(), sellerId, userId, sellerSubtotal);
+                    if (d.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        discount = d.doubleValue();
+                        voucherId = voucher.getId();
+                    }
+                }
+            }
+            // 2c. Tính phí ship server-side (group theo seller, gọi GHN)
+            double shippingFee = shippingFeeCalculator.calculate(
+                    request.getItems(),
+                    request.getToGhnDistrictId(),
+                    request.getToGhnWardCode()
+            );
+
+            // 2d. Verify client-side fee — nếu lệch > 10% thì reject (chống tampering)
+            if (request.getClientShippingFee() != null && request.getClientShippingFee() > 0) {
+                double clientFee = request.getClientShippingFee();
+                double diff = Math.abs(shippingFee - clientFee);
+                double tolerance = Math.max(5000.0, shippingFee * 0.10);
+                if (diff > tolerance) {
+                    log.warn("Shipping fee mismatch: client={}, server={}", clientFee, shippingFee);
+                    throw new com.ecommerce.order_service.exception.CustomException(
+                            "Phí vận chuyển không khớp. Vui lòng tải lại trang.",
+                            org.springframework.http.HttpStatus.BAD_REQUEST);
+                }
+            }
+
+            double totalPrice = Math.max(0.0, subtotal - discount + shippingFee);
+
+            // 3. Atomic DB write: order + items + outbox event (single transaction, NO HTTP)
+            Order savedOrder = persistenceHandler.persist(request, userId, totalPrice, address, voucherId,
+                    discount > 0 ? discount : null, shippingFee, commissionRates);
+
+            // 3b. Increment voucher usage
+            if (voucherId != null) {
+                voucherService.incrementUsage(voucherId);
+            }
+
+            // 4. Decrement stock — HTTP call after DB commit (Circuit Breaker)
+            orderValidator.decrementStock(request.getItems());
+
+            // 5. Clear cart items đã đặt — do frontend tự xoá theo từng id để chỉ xoá item được chọn,
+            // tránh wipe sạch giỏ hàng khi user chỉ checkout một phần.
+
+            return mapToResponse(savedOrder);
+        } finally {
+            // Release all acquired locks in reverse order
+            for (int i = acquiredLocks.size() - 1; i >= 0; i--) {
+                org.redisson.api.RLock lock = acquiredLocks.get(i);
+                if (lock != null && lock.isHeldByCurrentThread()) {
+                    lock.unlock();
                 }
             }
         }
-        // 2c. Tính phí ship server-side (group theo seller, gọi GHN)
-        double shippingFee = shippingFeeCalculator.calculate(
-                request.getItems(),
-                request.getToGhnDistrictId(),
-                request.getToGhnWardCode()
-        );
-
-        // 2d. Verify client-side fee — nếu lệch > 10% thì reject (chống tampering)
-        if (request.getClientShippingFee() != null && request.getClientShippingFee() > 0) {
-            double clientFee = request.getClientShippingFee();
-            double diff = Math.abs(shippingFee - clientFee);
-            double tolerance = Math.max(5000.0, shippingFee * 0.10);
-            if (diff > tolerance) {
-                log.warn("Shipping fee mismatch: client={}, server={}", clientFee, shippingFee);
-                throw new com.ecommerce.order_service.exception.CustomException(
-                        "Phí vận chuyển không khớp. Vui lòng tải lại trang.",
-                        org.springframework.http.HttpStatus.BAD_REQUEST);
-            }
-        }
-
-        double totalPrice = Math.max(0.0, subtotal - discount + shippingFee);
-
-        // 3. Atomic DB write: order + items + outbox event (single transaction, NO HTTP)
-        Order savedOrder = persistenceHandler.persist(request, userId, totalPrice, address, voucherId,
-                discount > 0 ? discount : null, shippingFee, commissionRates);
-
-        // 3b. Increment voucher usage
-        if (voucherId != null) {
-            voucherService.incrementUsage(voucherId);
-        }
-
-        // 4. Decrement stock — HTTP call after DB commit (Circuit Breaker)
-        orderValidator.decrementStock(request.getItems());
-
-        // 5. Clear cart items đã đặt — do frontend tự xoá theo từng id để chỉ xoá item được chọn,
-        // tránh wipe sạch giỏ hàng khi user chỉ checkout một phần.
-
-        return mapToResponse(savedOrder);
     }
 
     @Override

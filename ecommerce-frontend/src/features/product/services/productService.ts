@@ -67,4 +67,19 @@ export const productService = {
         comment: payload.comment,
       })
       .then((r) => (typeof r.data === 'string' ? r.data : normalizeReview(r.data))),
+
+  checkStock: async (payload: { items: { productId: string; variantId?: string | null; quantity: number }[] }) => {
+    const response = await api.post<{
+      available: boolean;
+      outOfStockItems: {
+        productId: string;
+        variantId: string | null;
+        productName: string;
+        requested: number;
+        available: number;
+      }[];
+      commissionRates: Record<string, number>;
+    }>('/api/products/check-stock', payload);
+    return response.data;
+  },
 };
