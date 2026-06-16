@@ -1,0 +1,67 @@
+name: ZORA Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'ecommerce-backend/**'
+
+jobs:
+  # Giai đoạn 1: CI (Continuous Integration) - Tự động Test
+  build-and-test:
+    name: Build & Test Java Microservices
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ecommerce-backend
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Make Maven Wrapper Executable
+      run: chmod +x mvnw
+
+    - name: Compile and Run Unit Tests
+      run: ./mvnw clean test
+
+  # Giai đoạn 2: CD (Continuous Delivery) - Tự động tạo Docker Image
+  build-and-push-docker:
+    name: Build & Push Docker Images
+    needs: build-and-test 
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ecommerce-backend
+
+    # Cấp quyền cho Action để đẩy Docker lên kho của GitHub
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Log in to the Container registry (GHCR)
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and Push Gateway Service Docker Image
+      run: |
+        docker build -t ghcr.io/${{ github.repository_owner }}/zora-gateway:latest ./gateway-service
+        docker push ghcr.io/${{ github.repository_owner }}/zora-gateway:latest
+
+    # Ghi chú: 
+    # Nếu có EC2, bước tiếp theo sẽ là SSH vào server:
+    # run: ssh user@ec2 "docker-compose pull && docker-compose up -d"

@@ -6,6 +6,11 @@
 
 ZORA is a comprehensive, distributed e-commerce platform designed for high performance, scalability, and an enriched user experience. Originally architected as a university graduation capstone project, this platform leverages a polyglot microservices approach, utilizing **Java Spring Boot** for core backend operations, robust event-driven architecture with **Kafka**, and Docker for seamless containerization.
 
+## 📥 Live Demo & Application
+
+- 🌐 **Web Storefront:** [https://zora-ecommerce-ecosystem.vercel.app](https://zora-ecommerce-ecosystem.vercel.app)
+- 📱 **Mobile App (Android APK):** [Link_Download_APK_Here](#) *(Currently building via Expo EAS...)*
+
 ---
 
 ## 🌟 Deep-Dive Features
