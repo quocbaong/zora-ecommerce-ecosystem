@@ -90,6 +90,7 @@ const HomeScreen = ({ navigation }: any) => {
       {/* Search Bar */}
       <View className="px-4 py-2">
         <TouchableOpacity 
+          onPress={() => navigation.navigate('SearchFilter')}
           className="bg-white flex-row items-center px-4 py-3 rounded-2xl shadow-sm border border-gray-100"
         >
           <Search size={20} color={COLORS.textSecondary} />
@@ -156,6 +157,7 @@ const HomeScreen = ({ navigation }: any) => {
             {(categories.length > 0 ? categories : CATEGORIES).map((c) => (
               <TouchableOpacity 
                 key={c.id} 
+                onPress={() => navigation.navigate('SearchFilter', { categoryId: c.id })}
                 className="w-28 h-28 bg-white m-1.5 rounded-3xl overflow-hidden border border-gray-100 shadow-sm items-center justify-center"
               >
                 <View className="w-14 h-14 rounded-full overflow-hidden mb-2 bg-gray-50">

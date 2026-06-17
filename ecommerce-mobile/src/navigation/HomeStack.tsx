@@ -2,6 +2,7 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from '../screens/HomeScreen';
 import ProductDetailScreen from '../screens/product/ProductDetailScreen';
+import SearchFilterScreen from '../screens/product/SearchFilterScreen';
 import NotificationScreen from '../screens/NotificationScreen';
 import QRScannerScreen from '../screens/chat/QRScannerScreen';
 import MyQRCodeScreen from '../screens/chat/MyQRCodeScreen';
@@ -26,6 +27,11 @@ export default function HomeStack() {
         name="ProductDetail" 
         component={ProductDetailScreen}
         options={{ title: 'Chi tiết sản phẩm' }}
+      />
+      <Stack.Screen 
+        name="SearchFilter" 
+        component={SearchFilterScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="Notification" 
