@@ -24,6 +24,7 @@ import { productApi } from '../features/product/api';
 import { Product } from '../types';
 import ProductCard from '../components/ProductCard';
 import { useHistoryStore } from '../store/useHistoryStore';
+import { useNotificationStore } from '../store/notificationStore';
 import { UTILITIES, CATEGORIES, COLORS } from '../constants';
 import AiChatWidget from '../features/ai/components/AiChatWidget';
 
@@ -38,6 +39,8 @@ const HomeScreen = ({ navigation }: any) => {
   const [loadingMore, setLoadingMore] = useState(false);
   
   const recentlyViewed = useHistoryStore((state) => state.recentlyViewed);
+  const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const fetchNotifications = useNotificationStore((state) => state.fetchNotifications);
 
   const loadInitialData = async () => {
     try {
@@ -72,11 +75,13 @@ const HomeScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     loadInitialData();
+    fetchNotifications();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadInitialData();
+    await fetchNotifications();
     setRefreshing(false);
   };
 
@@ -230,9 +235,11 @@ const HomeScreen = ({ navigation }: any) => {
             className="p-2 ml-2 bg-gray-50 rounded-full relative"
           >
             <Bell size={22} color={COLORS.secondary} />
-            <View className="absolute top-0 right-0 bg-primary w-4 h-4 rounded-full border-2 border-white items-center justify-center">
-              <Text className="text-white text-[8px] font-bold">2</Text>
-            </View>
+            {unreadCount > 0 && (
+              <View className="absolute top-0 right-0 bg-primary w-4 h-4 rounded-full border-2 border-white items-center justify-center">
+                <Text className="text-white text-[8px] font-bold">{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>

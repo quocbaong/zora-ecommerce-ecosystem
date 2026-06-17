@@ -5,7 +5,8 @@ import {
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator, 
-  RefreshControl
+  RefreshControl,
+  ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
@@ -17,9 +18,10 @@ import {
   CheckCircle2,
   ChevronLeft,
   Calendar,
-  Settings
+  Settings,
+  MessageCircle
 } from 'lucide-react-native';
-import { notificationApi } from '../features/notification/api';
+import { useNotificationStore } from '../store/notificationStore';
 import { Notification } from '../types';
 import { COLORS } from '../constants';
 
@@ -30,36 +32,34 @@ const NotificationIcon = ({ type }: { type: string }) => {
     ORDER_SHIPPED: { color: '#a855f7', bg: '#f3e8ff', icon: Truck },
     SYSTEM_ALERT: { color: COLORS.error, bg: '#fef2f2', icon: Info },
     PROMOTION: { color: COLORS.primary, bg: '#fff7ed', icon: Bell },
+    CHAT: { color: '#ec4899', bg: '#fdf2f8', icon: MessageCircle }
   };
 
   const config = configs[type] || { color: '#6b7280', bg: '#f3f4f6', icon: Info };
   const Icon = config.icon;
 
   return (
-    <View style={{ backgroundColor: config.bg }} className="w-14 h-14 rounded-[20px] items-center justify-center shadow-sm">
+    <View style={{ backgroundColor: config.bg }} className="w-14 h-14 rounded-[20px] items-center justify-center shadow-sm border border-gray-100">
       <Icon size={24} color={config.color} strokeWidth={2} />
     </View>
   );
 };
 
+const TABS = [
+  { id: 'ALL', label: 'Tất cả' },
+  { id: 'ORDER', label: 'Cập nhật đơn hàng' },
+  { id: 'PROMOTION', label: 'Khuyến mãi' },
+  { id: 'CHAT', label: 'Chat' },
+];
+
 const NotificationScreen = ({ navigation }: any) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { notifications, fetchNotifications, markAsRead } = useNotificationStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  const fetchNotifications = async () => {
-    try {
-      const data = await notificationApi.getNotifications();
-      setNotifications(data || []);
-    } catch (error) {
-      console.error('Failed to fetch notifications', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [activeTab, setActiveTab] = useState('ALL');
 
   useEffect(() => {
-    fetchNotifications();
+    fetchNotifications().finally(() => setLoading(false));
   }, []);
 
   const onRefresh = async () => {
@@ -68,25 +68,24 @@ const NotificationScreen = ({ navigation }: any) => {
     setRefreshing(false);
   };
 
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await notificationApi.markAsRead(id);
-      setNotifications(notifications.map(n => n.id === id ? { ...n, isRead: true } : n));
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  const filteredNotifications = notifications.filter(n => {
+    if (activeTab === 'ALL') return true;
+    if (activeTab === 'ORDER') return n.type.includes('ORDER') || n.type.includes('PAYMENT');
+    if (activeTab === 'PROMOTION') return n.type === 'PROMOTION';
+    if (activeTab === 'CHAT') return n.type === 'CHAT';
+    return true;
+  });
 
   const renderItem = ({ item }: { item: Notification }) => (
     <TouchableOpacity 
       activeOpacity={0.7}
-      onPress={() => handleMarkAsRead(item.id)}
-      className={`flex-row p-5 mb-3 mx-4 rounded-3xl items-center border border-gray-100 shadow-sm ${!item.isRead ? 'bg-[#FFF9F6]' : 'bg-white'}`}
+      onPress={() => markAsRead(item.id)}
+      className={`flex-row p-5 mb-3 mx-4 rounded-3xl items-center border shadow-sm ${!item.isRead ? 'bg-[#FFF9F6] border-orange-100' : 'bg-white border-gray-100'}`}
     >
       <NotificationIcon type={item.type} />
       <View className="flex-1 ml-4">
         <View className="flex-row justify-between items-center mb-1">
-          <Text className={`text-sm tracking-tight ${!item.isRead ? 'font-bold text-secondary' : 'text-gray-500 font-semibold'}`} numberOfLines={1}>
+          <Text className={`text-sm tracking-tight flex-1 mr-2 ${!item.isRead ? 'font-bold text-secondary' : 'text-gray-500 font-semibold'}`} numberOfLines={1}>
             {item.title}
           </Text>
           {!item.isRead && (
@@ -111,7 +110,7 @@ const NotificationScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <View className="flex-1 bg-gray-50/30">
-        <View className="px-6 py-6 bg-white rounded-b-[40px] shadow-sm flex-row justify-between items-end border-b border-gray-50">
+        <View className="px-6 py-4 bg-white shadow-sm flex-row justify-between items-end border-b border-gray-50">
            <View>
              <Text className="text-secondary font-bold text-3xl tracking-tighter">Thông báo</Text>
              <Text className="text-gray-400 font-medium text-xs mt-1">Tin mới từ hệ thống ZORA</Text>
@@ -126,13 +125,37 @@ const NotificationScreen = ({ navigation }: any) => {
            </View>
         </View>
 
+        {/* Tabs */}
+        <View className="bg-white rounded-b-[40px] pb-4 shadow-sm z-10">
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16 }}
+          >
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <TouchableOpacity
+                  key={tab.id}
+                  onPress={() => setActiveTab(tab.id)}
+                  className={`mr-3 px-5 py-2.5 rounded-full ${isActive ? 'bg-primary shadow-sm shadow-orange-500/20' : 'bg-gray-50 border border-gray-100'}`}
+                >
+                  <Text className={`text-[12px] font-bold ${isActive ? 'text-white' : 'text-gray-500'}`}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </ScrollView>
+        </View>
+
         {loading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator color={COLORS.primary} size="large" />
           </View>
         ) : (
           <FlatList
-            data={notifications}
+            data={filteredNotifications}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingVertical: 20, paddingBottom: 100 }}
@@ -144,13 +167,15 @@ const NotificationScreen = ({ navigation }: any) => {
                   <Bell size={64} color={COLORS.primary} strokeWidth={1} />
                 </View>
                 <Text className="text-secondary font-bold text-xl tracking-tight">Hộp thư trống</Text>
-                <Text className="text-gray-400 mt-2 font-medium text-center px-12 leading-5">Đừng lo! Các chương trình khuyến mãi và cập nhật đơn hàng sẽ sớm xuất hiện tại đây.</Text>
-                <TouchableOpacity 
-                   onPress={() => navigation.navigate('Home')}
-                   className="mt-8 bg-primary px-10 py-3 rounded-2xl shadow-lg shadow-orange-500/20"
-                >
-                   <Text className="text-white font-bold uppercase tracking-widest text-[10px]">Mua sắm ngay</Text>
-                </TouchableOpacity>
+                <Text className="text-gray-400 mt-2 font-medium text-center px-12 leading-5">Không có thông báo nào trong mục này.</Text>
+                {activeTab !== 'ALL' && (
+                  <TouchableOpacity 
+                    onPress={() => setActiveTab('ALL')}
+                    className="mt-8 bg-primary px-8 py-3 rounded-2xl shadow-lg shadow-orange-500/20"
+                  >
+                     <Text className="text-white font-bold uppercase tracking-widest text-xs">Xem tất cả</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           />

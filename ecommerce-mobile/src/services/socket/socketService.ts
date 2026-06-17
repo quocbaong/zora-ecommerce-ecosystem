@@ -232,6 +232,13 @@ class SocketService {
        useChatStore.getState().updateUserStatus?.(userId, status);
     });
 
+    this.socket.on('new_notification', (notification) => {
+       console.log('[SOCKET] new_notification received:', notification);
+       // Dynamically import to avoid circular dependency
+       const { useNotificationStore } = require('../../store/notificationStore');
+       useNotificationStore.getState().receiveNotification(notification);
+    });
+
     // ─── WebRTC Call Events ─────────────────────────────────────────
     this.socket.on('incoming_call', (data) => {
       const callState = useChatStore.getState().call;
