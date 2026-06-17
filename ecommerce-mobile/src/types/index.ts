@@ -104,7 +104,7 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'ORDER_SHIPPED' | 'SYSTEM_ALERT' | 'PROMOTION';
+  type: 'ORDER_CREATED' | 'PAYMENT_SUCCESS' | 'ORDER_SHIPPED' | 'SYSTEM_ALERT' | 'PROMOTION' | 'CHAT';
   isRead: boolean;
   createdAt: string;
 }

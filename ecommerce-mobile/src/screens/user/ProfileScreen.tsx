@@ -212,7 +212,7 @@ export default function ProfileScreen({ navigation }: any) {
                     <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-tighter">Đơn hàng</Text>
                  </TouchableOpacity>
                  <View className="w-[1px] h-8 bg-gray-200 self-center" />
-                 <TouchableOpacity className="flex-1 items-center py-3">
+                 <TouchableOpacity onPress={() => navigation.navigate('MyVouchers')} className="flex-1 items-center py-3">
                     <Text className="text-secondary font-bold text-lg">{stats.vouchers || 0}</Text>
                     <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-tighter">Voucher</Text>
                  </TouchableOpacity>
