@@ -232,4 +232,14 @@ public class ProductController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * POST /api/products/admin/elasticsearch/sync
+     * Admin endpoint — đồng bộ toàn bộ dữ liệu Sản phẩm đang có từ PostgreSQL lên Elasticsearch
+     */
+    @PostMapping("/admin/elasticsearch/sync")
+    public ResponseEntity<String> syncElasticsearch() {
+        productService.syncAllProductsToElasticsearch();
+        return ResponseEntity.ok("Đồng bộ dữ liệu lên Elasticsearch thành công!");
+    }
+
 }

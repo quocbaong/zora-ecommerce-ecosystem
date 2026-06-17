@@ -49,4 +49,6 @@ public interface ProductService {
     // Kiểm tra tồn kho cho danh sách sản phẩm trước khi tạo đơn
     com.ecommerce.product.dto.response.StockCheckResponse checkStock(com.ecommerce.product.dto.request.StockCheckRequest request);
 
+    // Đồng bộ toàn bộ dữ liệu từ DB sang Elasticsearch
+    void syncAllProductsToElasticsearch();
 }

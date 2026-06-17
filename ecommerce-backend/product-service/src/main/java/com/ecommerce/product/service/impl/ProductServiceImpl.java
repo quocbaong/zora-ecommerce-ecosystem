@@ -46,10 +46,11 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductImageRepository productImageRepository;
-     private final ProductVariantRepository productVariantRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final ProductReviewRepository productReviewRepository;
     private final CategoryAttributeRepository categoryAttributeRepository;
     private final CommissionRateRepository commissionRateRepository;
+    private final com.ecommerce.product.repository.ProductElasticsearchRepository productElasticsearchRepository;
 
     private final ImageUploadService imageUploadService;
     private final ProductEventProducer productEventProducer;
@@ -201,13 +202,41 @@ public class ProductServiceImpl implements ProductService {
     public Page<ProductResponse> filterAndSearchProducts(String keyword, String categoryId, String sellerId, Double minPrice, Double maxPrice, Integer minRating, Pageable pageable) {
         log.info("Tìm kiếm sản phẩm với keyword: {}, categoryId: {}, sellerId: {}, price: {} - {}, minRating: {}", keyword, categoryId, sellerId, minPrice, maxPrice, minRating);
 
-        // Chuyển đổi Double sang BigDecimal để tính toán chính xác tiền tệ
+        // 1. NẾU CÓ KEYWORD -> TÌM BẰNG ELASTICSEARCH (Fuzzy Search siêu tốc)
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            log.info("=> Bẻ lái truy vấn sang Elasticsearch (CQRS Pattern)...");
+            Page<com.ecommerce.product.document.ProductDocument> esPage = productElasticsearchRepository.searchByNameFuzzyAndActive(keyword, pageable);
+            
+            List<String> productIds = esPage.getContent().stream()
+                    .map(com.ecommerce.product.document.ProductDocument::getId)
+                    .collect(Collectors.toList());
+            
+            if (productIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+            
+            // Lấy Data Full từ PostgresSQL theo list ID trả về từ ES
+            List<Product> productsFromDb = productRepository.findAllById(productIds);
+            
+            // Map lại để giữ nguyên thứ tự Ranking xịn xò của Elasticsearch
+            Map<String, Product> productMap = productsFromDb.stream()
+                    .collect(Collectors.toMap(Product::getId, p -> p));
+            
+            List<ProductResponse> responses = productIds.stream()
+                    .filter(productMap::containsKey)
+                    .map(id -> mapToProductResponse(productMap.get(id)))
+                    .collect(Collectors.toList());
+                    
+            return new org.springframework.data.domain.PageImpl<>(responses, pageable, esPage.getTotalElements());
+        }
+
+        // 2. NẾU KHÔNG CÓ KEYWORD (chỉ lọc theo danh mục/giá...) -> TÌM TRONG POSTGRESQL NHƯ CŨ
         BigDecimal min = minPrice != null ? BigDecimal.valueOf(minPrice) : null;
         BigDecimal max = maxPrice != null ? BigDecimal.valueOf(maxPrice) : null;
         BigDecimal rating = minRating != null ? BigDecimal.valueOf(minRating) : null;
 
         Page<Product> productPage = productRepository.searchProducts(
-                keyword,
+                null, // Bỏ keyword vì đã check ở trên
                 categoryId,
                 sellerId,
                 ProductStatus.ACTIVE,
@@ -630,6 +659,31 @@ public class ProductServiceImpl implements ProductService {
                     .createdAt(review.getCreatedAt())
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    @Override
+    public void syncAllProductsToElasticsearch() {
+        log.info("Bắt đầu đồng bộ toàn bộ Sản phẩm từ DB lên Elasticsearch...");
+        java.util.List<Product> allProducts = productRepository.findAll();
+        java.util.List<com.ecommerce.product.document.ProductDocument> documents = new java.util.ArrayList<>();
+        
+        for (Product product : allProducts) {
+            com.ecommerce.product.document.ProductDocument doc = com.ecommerce.product.document.ProductDocument.builder()
+                    .id(product.getId())
+                    .name(product.getName())
+                    .description(product.getDescription())
+                    .price(product.getPrice())
+                    .sellerId(product.getSellerId())
+                    .status(product.getStatus().name())
+                    .ratingAvg(product.getRatingAvg())
+                    .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
+                    .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                    .build();
+            documents.add(doc);
+        }
+        
+        productElasticsearchRepository.saveAll(documents);
+        log.info("Hoàn tất đồng bộ {} sản phẩm lên Elasticsearch!", documents.size());
     }
 
 }

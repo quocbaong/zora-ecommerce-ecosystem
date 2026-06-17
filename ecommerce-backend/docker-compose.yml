@@ -310,9 +310,38 @@ services:
       - ./promtail-config.yml:/etc/promtail/config.yml
     command: -config.file=/etc/promtail/config.yml
 
+  elasticsearch:
+    <<: *default-logging
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    container_name: ecommerce-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    networks:
+      - app-network
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  kibana:
+    <<: *default-logging
+    image: docker.elastic.co/kibana/kibana:8.10.2
+    container_name: ecommerce-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - app-network
+    depends_on:
+      - elasticsearch
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  elasticsearch_data:
