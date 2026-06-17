@@ -50,4 +50,14 @@ export const productApi = {
     const response = await apiClient.delete(`/products/${id}`);
     return response.data;
   },
+
+  getReviews: async (productId: string) => {
+    const response = await apiClient.get<any[]>(`/products/${productId}/reviews`);
+    return response.data;
+  },
+
+  getRecommendations: async (productId: string) => {
+    const response = await apiClient.get<string[]>(`/ai/recommendations/${productId}`);
+    return response.data;
+  },
 };
