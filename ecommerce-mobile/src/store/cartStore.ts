@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import apiClient from '../api/client';
 import { Product, ProductVariant } from '../types';
 
-interface CartItem {
+export interface CartItem {
+  id: string; // CartItem ID in DB
   productId: string;
   name: string;
   price: number;
@@ -10,81 +12,95 @@ interface CartItem {
   variantId?: string;
   variantName?: string;
   sellerId: string;
-  shopName: string;
+  shopName?: string;
 }
 
 interface CartState {
   items: CartItem[];
-  addItem: (product: Product, variant?: ProductVariant, quantity?: number) => void;
-  removeItem: (productId: string, variantId?: string) => void;
-  updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
-  clearCart: () => void;
-  getTotalPrice: () => number;
+  loading: boolean;
+  fetchCart: () => Promise<void>;
+  addItem: (product: Product, variant?: ProductVariant, quantity?: number) => Promise<void>;
+  removeItem: (itemId: string) => Promise<void>;
+  updateQuantity: (itemId: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
   getItemCount: () => number;
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
+  loading: false,
 
-  addItem: (product, variant, quantity = 1) => {
-    const { items } = get();
-    const variantId = variant?.id;
-    const variantName = variant ? `${variant.color || ''} ${variant.size || ''}` : undefined;
-    
-    const existingIndex = items.findIndex(
-      (item) => item.productId === product.id && item.variantId === variantId
-    );
+  fetchCart: async () => {
+    set({ loading: true });
+    try {
+      const response = await apiClient.get('/cart');
+      const data = response.data?.data || response.data;
+      if (data && data.items) {
+        set({ items: data.items, loading: false });
+      } else {
+        set({ items: [], loading: false });
+      }
+    } catch (error) {
+      console.error('Lỗi khi lấy giỏ hàng:', error);
+      set({ loading: false });
+    }
+  },
 
-    if (existingIndex > -1) {
-      const updatedItems = [...items];
-      updatedItems[existingIndex].quantity += quantity;
-      set({ items: updatedItems });
-    } else {
-      const newItem: CartItem = {
+  addItem: async (product, variant, quantity = 1) => {
+    try {
+      await apiClient.post('/cart/items', {
         productId: product.id,
-        name: product.name,
-        price: product.price + (variant?.additionalPrice || 0),
-        image: product.images[0] || '',
         quantity,
-        variantId,
-        variantName,
-        sellerId: product.sellerId || 'unknown',
-        shopName: product.verified ? 'Zora Mall Store' : 'Shop ZORA',
-      };
-      set({ items: [...items, newItem] });
+        price: product.price + (variant?.additionalPrice || 0),
+        name: product.name,
+        image: product.images?.[0] || '',
+        variantId: variant?.id,
+        variantName: variant ? `${variant.color || ''} ${variant.size || ''}` : undefined,
+        sellerId: product.sellerId,
+      });
+      await get().fetchCart();
+    } catch (error) {
+      console.error('Lỗi thêm giỏ hàng:', error);
     }
   },
 
-  removeItem: (productId, variantId) => {
-    const { items } = get();
-    set({
-      items: items.filter(
-        (item) => !(item.productId === productId && item.variantId === variantId)
-      ),
-    });
+  removeItem: async (itemId) => {
+    try {
+      await apiClient.delete(`/cart/items/${itemId}`);
+      await get().fetchCart();
+    } catch (error) {
+      console.error('Lỗi xoá sản phẩm:', error);
+    }
   },
 
-  updateQuantity: (productId, quantity, variantId) => {
-    const { items } = get();
+  updateQuantity: async (itemId, quantity) => {
     if (quantity <= 0) {
-      get().removeItem(productId, variantId);
-      return;
+      return get().removeItem(itemId);
     }
-    
-    set({
-      items: items.map((item) =>
-        item.productId === productId && item.variantId === variantId
-          ? { ...item, quantity }
-          : item
-      ),
-    });
+    try {
+      // Optimistic update for smooth UI
+      const items = [...get().items];
+      const idx = items.findIndex(i => i.id === itemId);
+      if (idx > -1) {
+        items[idx].quantity = quantity;
+        set({ items });
+      }
+      
+      await apiClient.put(`/cart/items/${itemId}?quantity=${quantity}`);
+      await get().fetchCart(); // Ensure sync
+    } catch (error) {
+      console.error('Lỗi cập nhật số lượng:', error);
+      await get().fetchCart(); // Revert on error
+    }
   },
 
-  clearCart: () => set({ items: [] }),
-
-  getTotalPrice: () => {
-    const { items } = get();
-    return items.reduce((total, item) => total + item.price * item.quantity, 0);
+  clearCart: async () => {
+    try {
+      await apiClient.delete('/cart');
+      set({ items: [] });
+    } catch (error) {
+      console.error('Lỗi xoá giỏ hàng:', error);
+    }
   },
 
   getItemCount: () => {
