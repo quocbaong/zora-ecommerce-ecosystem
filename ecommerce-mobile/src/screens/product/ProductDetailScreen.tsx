@@ -38,6 +38,9 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
+  
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<Product[]>([]);
 
   const cartCount = useCartStore((state) => state.getItemCount());
   const addToCart = useCartStore((state) => state.addItem);
@@ -91,6 +94,21 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
           if (data.variants && data.variants.length > 0) {
             setSelectedVariant(data.variants[0]);
           }
+
+          // Fetch Reviews
+          try {
+            const revs = await productApi.getReviews(productId);
+            setReviews(revs);
+          } catch(e) {}
+
+          // Fetch Recommendations
+          try {
+            const recIds = await productApi.getRecommendations(productId);
+            if (recIds && recIds.length > 0) {
+              const recProducts = await Promise.all(recIds.slice(0, 5).map(id => productApi.getProductById(id)));
+              setRecommendations(recProducts.filter(Boolean));
+            }
+          } catch(e) {}
         }
       } catch (error) {
         console.error('Failed to fetch product details', error);
@@ -277,6 +295,122 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
+          )}
+
+          {/* Shop Profile Mini */}
+          <View className="mb-8 bg-gray-50 p-4 rounded-[24px] border border-gray-100 flex-row items-center justify-between">
+            <View className="flex-row items-center flex-1">
+              <View className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-sm">
+                 <Image source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(product.sellerId)}&background=random` }} className="w-full h-full" />
+              </View>
+              <View className="ml-3 flex-1">
+                 <View className="flex-row items-center">
+                    <Text className="text-secondary font-bold text-sm mr-1">Zora Official Store</Text>
+                    {product.verified && <ShieldCheck size={14} color="#3b82f6" />}
+                 </View>
+                 <Text className="text-gray-400 text-xs mt-0.5">Thành viên từ 2023</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+               onPress={() => navigation.navigate('ShopProfile', { sellerId: product.sellerId })}
+               className="border border-primary px-3 py-1.5 rounded-full bg-white"
+            >
+               <Text className="text-primary font-bold text-xs">Xem Shop</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Reviews Block */}
+          <View className="mb-8">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-row items-center">
+                <View className="w-1 h-6 bg-primary rounded-full mr-3" />
+                <Text className="text-secondary font-bold text-lg uppercase tracking-tight">Khách hàng đánh giá</Text>
+              </View>
+              <TouchableOpacity>
+                <Text className="text-primary text-xs font-bold">Xem tất cả</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {reviews.length > 0 ? (
+              <View>
+                <View className="flex-row items-center bg-orange-50 p-4 rounded-[24px] mb-4">
+                  <View className="items-center mr-6 border-r border-orange-200 pr-6">
+                    <Text className="text-4xl font-black text-primary">{product.ratingAvg?.toFixed(1) || '0.0'}</Text>
+                    <View className="flex-row mt-1">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} size={10} color={s <= (product.ratingAvg || 0) ? "#FF6B35" : "#fdba74"} fill={s <= (product.ratingAvg || 0) ? "#FF6B35" : "#fdba74"} />
+                      ))}
+                    </View>
+                    <Text className="text-gray-500 text-[10px] mt-1">{reviews.length} đánh giá</Text>
+                  </View>
+                  <View className="flex-1">
+                     {[5,4,3,2,1].map(stars => {
+                        const count = reviews.filter(r => r.rating === stars).length;
+                        const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                        return (
+                          <View key={stars} className="flex-row items-center mb-1">
+                             <Text className="text-gray-500 text-[10px] w-4">{stars}</Text>
+                             <Star size={8} color="#9ca3af" fill="#9ca3af" className="mr-2" />
+                             <View className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <View className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                             </View>
+                          </View>
+                        );
+                     })}
+                  </View>
+                </View>
+
+                {reviews.slice(0, 3).map((r, i) => (
+                  <View key={i} className="mb-4 pb-4 border-b border-gray-100">
+                    <View className="flex-row items-center justify-between mb-2">
+                      <View className="flex-row items-center">
+                        <View className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden mr-2">
+                          <Image source={{ uri: `https://ui-avatars.com/api/?name=${r.customerName || 'User'}` }} className="w-full h-full" />
+                        </View>
+                        <View>
+                          <Text className="text-secondary font-bold text-xs">{r.customerName || 'Người mua Zora'}</Text>
+                          <View className="flex-row mt-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} size={8} color={s <= r.rating ? "#FBBF24" : "#E5E7EB"} fill={s <= r.rating ? "#FBBF24" : "#E5E7EB"} />
+                            ))}
+                          </View>
+                        </View>
+                      </View>
+                      <Text className="text-gray-400 text-[10px]">{new Date(r.createdAt).toLocaleDateString()}</Text>
+                    </View>
+                    <Text className="text-gray-600 text-xs leading-5 mt-1">{r.reviewText || r.comment}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View className="bg-gray-50 p-6 rounded-[24px] items-center">
+                <Text className="text-gray-400 font-medium text-xs">Chưa có đánh giá nào cho sản phẩm này.</Text>
+              </View>
+            )}
+          </View>
+
+          {/* AI Recommendations */}
+          {recommendations.length > 0 && (
+            <View className="mb-8">
+              <View className="flex-row items-center mb-4">
+                <View className="w-1 h-6 bg-primary rounded-full mr-3" />
+                <Text className="text-secondary font-bold text-lg uppercase tracking-tight">Sản phẩm tương tự</Text>
+                <View className="bg-orange-100 px-2 py-0.5 rounded ml-2">
+                  <Text className="text-primary text-[8px] font-bold">AI Suggests</Text>
+                </View>
+              </View>
+              
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mr-[-20px]">
+                {recommendations.map((p, idx) => (
+                  <View key={p.id || `rec-${idx}`} className="w-[160px] mr-4">
+                    <ProductCard 
+                      product={p} 
+                      onPress={(prod) => navigation.push('ProductDetail', { productId: prod.id })} 
+                    />
+                  </View>
+                ))}
+              </ScrollView>
             </View>
           )}
 
