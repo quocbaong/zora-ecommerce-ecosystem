@@ -14,6 +14,21 @@ export const orderApi = {
 
   getOrderById: async (id: string) => {
     const response = await apiClient.get<ApiResponse<Order>>(`/orders/${id}`);
-    return response.data.data;
+    return response.data.data || response.data;
+  },
+
+  cancelOrder: async (id: string) => {
+    const response = await apiClient.patch(`/orders/${id}/cancel`);
+    return response.data;
+  },
+
+  confirmDelivery: async (id: string) => {
+    const response = await apiClient.patch(`/orders/${id}/deliver`);
+    return response.data;
+  },
+
+  requestDispute: async (id: string, payload: any) => {
+    const response = await apiClient.post(`/orders/${id}/dispute`, payload);
+    return response.data;
   },
 };
