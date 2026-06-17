@@ -476,7 +476,7 @@ export default function CartPage() {
                     <input
                       type="checkbox"
                       checked={checked && !isOutOfStock}
-                      disabled={isOutOfStock}
+                      disabled={!!isOutOfStock}
                       onChange={() => toggleItem(id)}
                       className={`w-4 h-4 cursor-pointer shrink-0 mt-1 md:mt-0 ${isOutOfStock ? 'accent-gray-300 opacity-50 cursor-not-allowed' : 'accent-orange-500'}`}
                     />
