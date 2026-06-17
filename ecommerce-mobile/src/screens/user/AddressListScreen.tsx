@@ -14,7 +14,7 @@ import { userApi } from '../../features/user/api';
 import { ShippingAddress } from '../../types';
 import { COLORS } from '../../constants';
 
-export default function AddressListScreen({ navigation }: any) {
+export default function AddressListScreen({ route, navigation }: any) {
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,22 +59,34 @@ export default function AddressListScreen({ navigation }: any) {
     ]);
   };
 
+  const isSelectionMode = route.params?.isSelectionMode || false;
+
+  const handleSelect = (item: any) => {
+    if (isSelectionMode) {
+      navigation.navigate('Checkout', { selectedAddress: item });
+    }
+  };
+
   const renderItem = ({ item }: { item: any }) => (
-    <View className="bg-white p-5 rounded-[32px] mb-4 shadow-sm border border-gray-100">
+    <TouchableOpacity 
+      activeOpacity={isSelectionMode ? 0.7 : 1}
+      onPress={() => handleSelect(item)}
+      className="bg-white p-5 rounded-[32px] mb-4 shadow-sm border border-gray-100"
+    >
       <View className="flex-row items-start">
         <View className="bg-orange-50 p-3 rounded-2xl mr-4">
            {item.type === 'OFFICE' ? <Briefcase size={20} color={COLORS.primary} /> : <Home size={20} color={COLORS.primary} />}
         </View>
         <View className="flex-1">
           <View className="flex-row justify-between items-center mb-1">
-            <Text className="text-secondary font-bold text-base tracking-tight">{item.fullName}</Text>
-            {item.isDefault && (
+            <Text className="text-secondary font-bold text-base tracking-tight">{item.receiverName || item.fullName}</Text>
+            {item.default && (
                <View className="bg-green-50 px-2 py-1 rounded-lg">
                   <Text className="text-green-600 text-[8px] font-bold uppercase">Mặc định</Text>
                </View>
             )}
           </View>
-          <Text className="text-gray-400 text-xs font-medium mb-2">{item.phoneNumber}</Text>
+          <Text className="text-gray-400 text-xs font-medium mb-2">{item.phone || item.phoneNumber}</Text>
           <Text className="text-secondary text-sm leading-5 font-medium pr-8">
             {item.street}, {item.ward}, {item.district}, {item.province}
           </Text>
@@ -90,20 +102,20 @@ export default function AddressListScreen({ navigation }: any) {
                <Trash2 size={16} color="#ef4444" />
             </TouchableOpacity>
             <TouchableOpacity 
-               onPress={() => navigation.navigate('EditAddress', { address: item })}
+               onPress={() => navigation.navigate('AddressForm', { address: item })}
                className="bg-gray-50 p-2.5 rounded-xl"
             >
                <Edit2 size={16} color={COLORS.secondary} />
             </TouchableOpacity>
          </View>
          
-         {!item.isDefault && (
+         {!item.default && (
             <TouchableOpacity className="bg-secondary px-4 py-2 rounded-xl">
                <Text className="text-white font-bold text-[10px]">Đặt mặc định</Text>
             </TouchableOpacity>
          )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
