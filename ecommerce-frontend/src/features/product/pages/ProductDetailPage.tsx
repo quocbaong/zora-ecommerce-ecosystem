@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useProductDetail, useProductReviews, useProducts } from '@/features/product/hooks/useProducts';
+import { useProductDetail, useProductReviews, useProducts, useProductRecommendations } from '@/features/product/hooks/useProducts';
 import { userService } from '@/features/user/services/userService';
+import RecommendedProducts from '../components/RecommendedProducts';
 import { useCategories, useCategoryAttributes } from '@/features/product/hooks/useCategories';
 import { useShop, useShopVouchers, useSaveVoucher, useUnsaveVoucher } from '@/features/shop/hooks/useShop';
 import { useAuthStore } from '@/stores/authStore';
@@ -33,6 +34,7 @@ export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: product, isLoading, isError } = useProductDetail(id!);
+  const { data: recommendations } = useProductRecommendations(id!);
   const { data: reviews } = useProductReviews(id!);
   const { data: categoryAttributes } = useCategoryAttributes(product?.categoryId);
   const { data: shop } = useShop(product?.sellerId);
@@ -607,6 +609,9 @@ if (isLoading) {
           <p className="text-sm text-muted-foreground">Chưa có đánh giá nào cho sản phẩm này.</p>
         )}
       </div>
+
+      {/* AI Recommendations */}
+      <RecommendedProducts productIds={recommendations || []} />
     </div>
   );
 }
