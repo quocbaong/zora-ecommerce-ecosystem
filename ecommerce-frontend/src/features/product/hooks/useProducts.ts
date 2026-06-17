@@ -42,6 +42,15 @@ export const useProductReviews = (productId: string) => {
   });
 };
 
+export const useProductRecommendations = (productId: string) => {
+  return useQuery<string[]>({
+    queryKey: ['productRecommendations', productId],
+    queryFn: () => productService.getRecommendations(productId),
+    staleTime: STALE_TIME,
+    enabled: !!productId,
+  });
+};
+
 // ─── Mutations ──────────────────────────────────────────────────
 
 export const useCreateProduct = () => {

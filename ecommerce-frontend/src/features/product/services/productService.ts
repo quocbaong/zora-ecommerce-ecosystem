@@ -82,4 +82,7 @@ export const productService = {
     }>('/api/products/check-stock', payload);
     return response.data;
   },
+
+  getRecommendations: (productId: string) =>
+    api.get<string[]>(`/api/ai/recommendations/${productId}`).then((r) => r.data),
 };

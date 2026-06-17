@@ -45,8 +45,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         boolean isPublicAds = path.equals("/api/ads/campaigns/active");
         boolean isPublicAppeals = path.startsWith("/api/users/appeals/public");
         boolean isPublicPaymentCreate = path.startsWith("/api/payments/create");
+        boolean isPublicAiRecommendations = path.startsWith("/api/ai/recommendations") && method.equals("GET");
         boolean isPublic = isAuth || isPublicProduct || isWebsocket || isHealthCheck || isWebhook
-                || isPublicUserSearch || isPublicShop || isPublicVoucherShop || isPublicShipping || isPublicAds || isPublicAppeals || isPublicPaymentCreate;
+                || isPublicUserSearch || isPublicShop || isPublicVoucherShop || isPublicShipping || isPublicAds || isPublicAppeals || isPublicPaymentCreate || isPublicAiRecommendations;
 
         String authHeader = request.getHeaders().getFirst("Authorization");
 
