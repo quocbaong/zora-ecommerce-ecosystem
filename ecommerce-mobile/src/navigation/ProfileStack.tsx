@@ -11,6 +11,7 @@ import AddProductScreen from '../screens/user/AddProductScreen';
 import OrderDetailScreen from '../screens/user/OrderDetailScreen';
 import ReviewFormScreen from '../screens/user/ReviewFormScreen';
 import DisputeFormScreen from '../screens/user/DisputeFormScreen';
+import MyVouchersScreen from '../screens/user/MyVouchersScreen';
 
 const Stack = createStackNavigator();
 
@@ -18,7 +19,7 @@ export default function ProfileStack() {
   return (
     <Stack.Navigator 
       screenOptions={{ 
-        headerShown: false, // Tắt Header mặc định để tránh dư thừa (nội dung đã có Custom Header)
+        headerShown: false,
         headerTitleAlign: 'center',
         headerTintColor: '#102a43',
         headerTitleStyle: { fontFamily: 'Inter_700Bold' },
@@ -29,6 +30,7 @@ export default function ProfileStack() {
       <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
       <Stack.Screen name="ReviewForm" component={ReviewFormScreen} />
       <Stack.Screen name="DisputeForm" component={DisputeFormScreen} />
+      <Stack.Screen name="MyVouchers" component={MyVouchersScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="AddressList" component={AddressListScreen} />
       <Stack.Screen name="AddAddress" component={AddAddressScreen} />
