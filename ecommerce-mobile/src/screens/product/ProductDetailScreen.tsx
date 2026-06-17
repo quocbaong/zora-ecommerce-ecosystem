@@ -27,6 +27,7 @@ import { useHistoryStore } from '../../store/useHistoryStore';
 import { Product, ProductVariant } from '../../types';
 import { COLORS } from '../../constants';
 import { useCartStore } from '../../store/cartStore';
+import ProductCard from '../../components/ProductCard';
 
 import ShareProductModal from '../../features/chat/components/ShareProductModal';
 
