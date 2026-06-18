@@ -15,32 +15,64 @@ import {
   ShoppingBag,
   ArrowRight,
   Store,
-  CheckSquare,
-  Square,
+  CheckCircle2,
+  Circle,
   Ticket
 } from 'lucide-react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useCartStore } from '../../store/cartStore';
+import { userApi } from '../../features/user/api';
 import { COLORS } from '../../constants';
 
 const CartScreen = ({ navigation }: any) => {
   const { items, loading, fetchCart, updateQuantity, removeItem, getItemCount } = useCartStore();
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [shopNames, setShopNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCart();
   }, []);
+
+  useEffect(() => {
+    // Resolve missing shop names
+    const resolveShopNames = async () => {
+      const missingSellerIds = new Set<string>();
+      items.forEach(item => {
+        if (item.sellerId && !shopNames[item.sellerId]) {
+          missingSellerIds.add(item.sellerId);
+        }
+      });
+
+      if (missingSellerIds.size > 0) {
+        const newShopNames = { ...shopNames };
+        await Promise.all(
+          Array.from(missingSellerIds).map(async (sellerId) => {
+            try {
+              const shopInfo = await userApi.getUserById(sellerId);
+              newShopNames[sellerId] = shopInfo?.fullName || shopInfo?.email || 'Người Bán Zora';
+            } catch (error) {
+              newShopNames[sellerId] = 'Zora Store';
+            }
+          })
+        );
+        setShopNames(newShopNames);
+      }
+    };
+
+    resolveShopNames();
+  }, [items]);
 
   const groupedItems = useMemo(() => {
     const groups: Record<string, { shopName: string; items: any[] }> = {};
     items.forEach((item) => {
       const sId = item.sellerId || 'unknown';
       if (!groups[sId]) {
-        groups[sId] = { shopName: item.shopName || 'Zora Store', items: [] };
+        groups[sId] = { shopName: shopNames[sId] || item.shopName || 'Đang tải...', items: [] };
       }
       groups[sId].items.push(item);
     });
     return Object.keys(groups).map((key) => ({ sellerId: key, ...groups[key] }));
-  }, [items]);
+  }, [items, shopNames]);
 
   const toggleItem = (itemId: string) => {
     const newSet = new Set(selectedItems);
@@ -80,68 +112,72 @@ const CartScreen = ({ navigation }: any) => {
 
   const renderItem = (item: any, isLast: boolean) => {
     const isSelected = selectedItems.has(item.id);
+
+    const renderRightActions = () => (
+      <TouchableOpacity 
+        onPress={() => removeItem(item.id)}
+        className="bg-red-500 w-[72px] items-center justify-center h-full"
+      >
+        <Trash2 size={24} color="white" />
+      </TouchableOpacity>
+    );
+
     return (
-      <View key={item.id} className={`flex-row items-center bg-white p-4 ${isLast ? '' : 'border-b border-gray-50'}`}>
-        <TouchableOpacity onPress={() => toggleItem(item.id)} className="mr-3">
-          {isSelected ? (
-            <CheckSquare size={20} color={COLORS.primary} fill="#fff7ed" />
-          ) : (
-            <Square size={20} color="#d1d5db" />
-          )}
-        </TouchableOpacity>
-        
-        <View className="shadow-sm">
-          <Image 
-            source={{ uri: item.image || 'https://via.placeholder.com/100' }} 
-            className="w-20 h-20 rounded-2xl bg-gray-50 border border-gray-100"
-            resizeMode="cover"
-          />
-        </View>
-        
-        <View className="flex-1 ml-3 justify-between py-1">
-          <View>
-            <View className="flex-row justify-between items-start">
+      <Swipeable key={item.id} renderRightActions={renderRightActions} overshootRight={false}>
+        <View className={`flex-row items-center bg-white p-4 ${isLast ? '' : 'border-b border-gray-50'}`}>
+          <TouchableOpacity onPress={() => toggleItem(item.id)} className="mr-3">
+            {isSelected ? (
+              <CheckCircle2 size={22} color={COLORS.primary} />
+            ) : (
+              <Circle size={22} color="#d1d5db" />
+            )}
+          </TouchableOpacity>
+          
+          <View className="shadow-sm">
+            <Image 
+              source={{ uri: item.image || 'https://via.placeholder.com/100' }} 
+              className="w-20 h-20 rounded-2xl bg-gray-50 border border-gray-100"
+              resizeMode="cover"
+            />
+          </View>
+          
+          <View className="flex-1 ml-3 justify-between py-1">
+            <View>
               <Text className="text-secondary font-bold text-sm flex-1 mr-2 leading-5" numberOfLines={2}>
                 {item.name}
               </Text>
-              <TouchableOpacity 
-                onPress={() => removeItem(item.id)}
-                className="p-1"
-              >
-                <Trash2 size={16} color={COLORS.error} />
-              </TouchableOpacity>
+              {item.variantName && (
+                <View className="bg-gray-50 self-start px-2 py-0.5 rounded-lg mt-1 border border-gray-100">
+                   <Text className="text-gray-400 text-[10px] font-medium uppercase tracking-tight">{item.variantName}</Text>
+                </View>
+              )}
             </View>
-            {item.variantName && (
-              <View className="bg-gray-50 self-start px-2 py-0.5 rounded-lg mt-1 border border-gray-100">
-                 <Text className="text-gray-400 text-[10px] font-medium uppercase tracking-tight">{item.variantName}</Text>
-              </View>
-            )}
-          </View>
 
-          <View className="flex-row justify-between items-center mt-2">
-            <Text className="text-primary font-bold text-sm">
-              ₫{item.price.toLocaleString()}
-            </Text>
-            <View className="flex-row items-center bg-gray-50 rounded-xl p-0.5 border border-gray-100">
-              <TouchableOpacity 
-                onPress={() => updateQuantity(item.id, item.quantity - 1)}
-                className="w-7 h-7 items-center justify-center bg-white rounded-lg shadow-sm border border-gray-50"
-              >
-                <Minus size={12} color={COLORS.secondary} strokeWidth={3} />
-              </TouchableOpacity>
-              <Text className="text-secondary font-bold mx-2 min-w-[16px] text-center text-xs">
-                {item.quantity}
+            <View className="flex-row justify-between items-center mt-2">
+              <Text className="text-primary font-bold text-sm">
+                ₫{item.price.toLocaleString()}
               </Text>
-              <TouchableOpacity 
-                onPress={() => updateQuantity(item.id, item.quantity + 1)}
-                className="w-7 h-7 items-center justify-center bg-white rounded-lg shadow-sm border border-gray-50"
-              >
-                <Plus size={12} color={COLORS.secondary} strokeWidth={3} />
-              </TouchableOpacity>
+              <View className="flex-row items-center bg-gray-50 rounded-xl p-0.5 border border-gray-100">
+                <TouchableOpacity 
+                  onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                  className="w-7 h-7 items-center justify-center bg-white rounded-lg shadow-sm border border-gray-50"
+                >
+                  <Minus size={12} color={COLORS.secondary} strokeWidth={3} />
+                </TouchableOpacity>
+                <Text className="text-secondary font-bold mx-2 min-w-[16px] text-center text-xs">
+                  {item.quantity}
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                  className="w-7 h-7 items-center justify-center bg-white rounded-lg shadow-sm border border-gray-50"
+                >
+                  <Plus size={12} color={COLORS.secondary} strokeWidth={3} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      </Swipeable>
     );
   };
 
@@ -194,14 +230,14 @@ const CartScreen = ({ navigation }: any) => {
                 <View className="flex-row items-center px-4 py-4 border-b border-gray-50 bg-gray-50/30">
                   <TouchableOpacity onPress={() => toggleShop(group.sellerId)} className="mr-2">
                     {isAllShopSelected ? (
-                      <CheckSquare size={20} color={COLORS.primary} fill="#fff7ed" />
+                      <CheckCircle2 size={22} color={COLORS.primary} />
                     ) : (
-                      <Square size={20} color="#d1d5db" />
+                      <Circle size={22} color="#d1d5db" />
                     )}
                   </TouchableOpacity>
                   <Store size={18} color={COLORS.primary} />
                   <Text className="font-bold text-secondary ml-2 flex-1">{group.shopName}</Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('ShopProfile', { sellerId: group.sellerId })}>
+                  <TouchableOpacity onPress={() => navigation.navigate('Home', { screen: 'ShopProfile', params: { sellerId: group.sellerId } })}>
                     <Text className="text-primary text-[10px] font-bold">Xem Shop</Text>
                   </TouchableOpacity>
                 </View>
@@ -229,9 +265,9 @@ const CartScreen = ({ navigation }: any) => {
         <View className="absolute bottom-0 left-0 right-0 bg-white p-4 pb-10 rounded-t-[48px] shadow-2xl border-t border-gray-50 flex-row items-center justify-between">
           <TouchableOpacity onPress={toggleAll} className="flex-row items-center ml-2">
             {selectedItems.size === items.length && items.length > 0 ? (
-              <CheckSquare size={22} color={COLORS.primary} fill="#fff7ed" />
+              <CheckCircle2 size={24} color={COLORS.primary} />
             ) : (
-              <Square size={22} color="#d1d5db" />
+              <Circle size={24} color="#d1d5db" />
             )}
             <Text className="text-secondary font-medium text-xs ml-2">Tất cả</Text>
           </TouchableOpacity>
@@ -243,18 +279,14 @@ const CartScreen = ({ navigation }: any) => {
             </View>
             <TouchableOpacity 
               onPress={() => {
-                if (selectedItems.size === 0) {
-                  // Show alert if nothing is selected
-                  // Usually done with Alert.alert, assuming it's imported or handled
-                } else {
-                  // Pass selected items to Checkout
+                if (selectedItems.size > 0) {
                   navigation.navigate('Checkout', { selectedItemIds: Array.from(selectedItems) });
                 }
               }}
               className={`${selectedItems.size > 0 ? 'bg-primary' : 'bg-gray-300'} flex-row items-center justify-center px-6 py-4 rounded-[24px] shadow-xl ${selectedItems.size > 0 ? 'shadow-orange-500/20' : ''}`}
               disabled={selectedItems.size === 0}
             >
-              <Text className="text-white font-bold text-sm">Mua hàng ({selectedItems.size})</Text>
+              <Text className="text-white font-bold text-sm">Thanh toán</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -87,7 +87,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       }
       
       await apiClient.put(`/cart/items/${itemId}?quantity=${quantity}`);
-      await get().fetchCart(); // Ensure sync
+      // Removed await get().fetchCart() here to prevent UI jumping when rapid clicking
     } catch (error) {
       console.error('Lỗi cập nhật số lượng:', error);
       await get().fetchCart(); // Revert on error

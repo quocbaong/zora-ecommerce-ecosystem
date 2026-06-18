@@ -11,6 +11,7 @@ import ChatStack from './ChatStack';
 import { COLORS } from '../constants';
 import GlobalCallOverlay from '../features/chat/components/GlobalCallOverlay';
 import socketService from '../services/socket/socketService';
+import { useCartStore } from '../store/cartStore';
 
 const Tab = createBottomTabNavigator();
 
@@ -18,6 +19,8 @@ export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const bottomPadding = insets.bottom > 0 ? insets.bottom : 12;
   const tabHeight = 58 + bottomPadding;
+  
+  const cartItemCount = useCartStore(state => state.items.length);
 
   const tabBarStyle = {
     height: tabHeight,
@@ -80,9 +83,11 @@ export default function MainTabs() {
             tabBarIcon: ({ color, size, focused }) => (
               <View className={focused ? 'bg-orange-50 p-2 rounded-xl' : ''}>
                 <ShoppingCart color={color} size={size} strokeWidth={focused ? 2.5 : 2} />
-                <View className="absolute -top-1 -right-1 bg-primary w-4 h-4 rounded-full items-center justify-center border border-white">
-                  <Text className="text-white text-[8px] font-bold">1</Text>
-                </View>
+                {cartItemCount > 0 && (
+                  <View className="absolute -top-1 -right-1 bg-primary w-4 h-4 rounded-full items-center justify-center border border-white">
+                    <Text className="text-white text-[8px] font-bold">{cartItemCount > 9 ? '9+' : cartItemCount}</Text>
+                  </View>
+                )}
               </View>
             ),
           }}
