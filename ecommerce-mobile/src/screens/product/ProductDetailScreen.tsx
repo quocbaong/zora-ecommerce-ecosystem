@@ -22,6 +22,7 @@ import {
   MessageSquare
 } from 'lucide-react-native';
 import { productApi } from '../../features/product/api';
+import { userApi } from '../../features/user/api';
 import apiClient from '../../api/client';
 import { useHistoryStore } from '../../store/useHistoryStore';
 import { Product, ProductVariant } from '../../types';
@@ -42,6 +43,8 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
   
   const [reviews, setReviews] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
+
+  const [shopRating, setShopRating] = useState<number>(5.0);
 
   const cartCount = useCartStore((state) => state.getItemCount());
   const addToCart = useCartStore((state) => state.addItem);
@@ -96,17 +99,36 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
             setSelectedVariant(data.variants[0]);
           }
 
-          // Fetch Reviews
+          // Fetch Shop Rating
+          try {
+            const sellerProducts = await productApi.getProductsBySeller(data.sellerId);
+            const ratedProducts = sellerProducts.filter((p: any) => p.ratingAvg && p.ratingAvg > 0);
+            if (ratedProducts.length > 0) {
+              const avg = ratedProducts.reduce((acc: number, p: any) => acc + (p.ratingAvg || 0), 0) / ratedProducts.length;
+              setShopRating(avg);
+            }
+          } catch(e) {}
+
+          // Fetch Reviews and resolve user names
           try {
             const revs = await productApi.getReviews(productId);
-            setReviews(revs);
+            const resolved = await Promise.all(revs.map(async (r: any) => {
+               if (r.customerName && r.customerName.length > 20 && r.customerName.includes('-')) {
+                  try {
+                      const user = await userApi.getUserById(r.customerName);
+                      return { ...r, customerName: user.fullName || user.email || 'Khách hàng Zora' };
+                  } catch(e) { return r; }
+               }
+               return r;
+            }));
+            setReviews(resolved);
           } catch(e) {}
 
           // Fetch Recommendations
           try {
             const recIds = await productApi.getRecommendations(productId);
             if (recIds && recIds.length > 0) {
-              const recProducts = await Promise.all(recIds.slice(0, 5).map(id => productApi.getProductById(id)));
+              const recProducts = await Promise.all(recIds.slice(0, 5).map((id: string) => productApi.getProductById(id)));
               setRecommendations(recProducts.filter(Boolean));
             }
           } catch(e) {}
@@ -310,7 +332,10 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
                     <Text className="text-secondary font-bold text-sm mr-1">Zora Official Store</Text>
                     {product.verified && <ShieldCheck size={14} color="#3b82f6" />}
                  </View>
-                 <Text className="text-gray-400 text-xs mt-0.5">Thành viên từ 2023</Text>
+                 <View className="flex-row items-center mt-0.5">
+                    <Star size={10} color="#FBBF24" fill="#FBBF24" />
+                    <Text className="text-gray-500 font-bold text-xs ml-1">{shopRating.toFixed(1)} / 5.0</Text>
+                 </View>
               </View>
             </View>
             <TouchableOpacity 
@@ -337,10 +362,14 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
               <View>
                 <View className="flex-row items-center bg-orange-50 p-4 rounded-[24px] mb-4">
                   <View className="items-center mr-6 border-r border-orange-200 pr-6">
-                    <Text className="text-4xl font-black text-primary">{product.ratingAvg?.toFixed(1) || '0.0'}</Text>
+                    <Text className="text-4xl font-black text-primary">
+                      {reviews.length > 0 
+                        ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) 
+                        : (product.ratingAvg?.toFixed(1) || '0.0')}
+                    </Text>
                     <View className="flex-row mt-1">
                       {[1,2,3,4,5].map(s => (
-                        <Star key={s} size={10} color={s <= (product.ratingAvg || 0) ? "#FF6B35" : "#fdba74"} fill={s <= (product.ratingAvg || 0) ? "#FF6B35" : "#fdba74"} />
+                        <Star key={s} size={10} color={s <= (reviews.length > 0 ? Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length) : (product.ratingAvg || 0)) ? "#FF6B35" : "#fdba74"} fill={s <= (reviews.length > 0 ? Math.round(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length) : (product.ratingAvg || 0)) ? "#FF6B35" : "#fdba74"} />
                       ))}
                     </View>
                     <Text className="text-gray-500 text-[10px] mt-1">{reviews.length} đánh giá</Text>
@@ -362,27 +391,31 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
                   </View>
                 </View>
 
-                {reviews.slice(0, 3).map((r, i) => (
-                  <View key={i} className="mb-4 pb-4 border-b border-gray-100">
-                    <View className="flex-row items-center justify-between mb-2">
-                      <View className="flex-row items-center">
-                        <View className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden mr-2">
-                          <Image source={{ uri: `https://ui-avatars.com/api/?name=${r.customerName || 'User'}` }} className="w-full h-full" />
-                        </View>
-                        <View>
-                          <Text className="text-secondary font-bold text-xs">{r.customerName || 'Người mua Zora'}</Text>
-                          <View className="flex-row mt-0.5">
-                            {[1,2,3,4,5].map(s => (
-                              <Star key={s} size={8} color={s <= r.rating ? "#FBBF24" : "#E5E7EB"} fill={s <= r.rating ? "#FBBF24" : "#E5E7EB"} />
-                            ))}
+                {reviews.slice(0, 3).map((r, i) => {
+                  const isUUID = r.customerName && r.customerName.length > 20 && r.customerName.includes('-');
+                  const displayName = isUUID ? 'Khách hàng ẩn danh' : (r.customerName || 'Người mua Zora');
+                  return (
+                    <View key={i} className="mb-4 pb-4 border-b border-gray-100">
+                      <View className="flex-row items-center justify-between mb-2">
+                        <View className="flex-row items-center">
+                          <View className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden mr-2">
+                            <Image source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}` }} className="w-full h-full" />
+                          </View>
+                          <View>
+                            <Text className="text-secondary font-bold text-xs">{displayName}</Text>
+                            <View className="flex-row mt-0.5">
+                              {[1,2,3,4,5].map(s => (
+                                <Star key={s} size={8} color={s <= r.rating ? "#FBBF24" : "#E5E7EB"} fill={s <= r.rating ? "#FBBF24" : "#E5E7EB"} />
+                              ))}
+                            </View>
                           </View>
                         </View>
+                        <Text className="text-gray-400 text-[10px]">{new Date(r.createdAt).toLocaleDateString()}</Text>
                       </View>
-                      <Text className="text-gray-400 text-[10px]">{new Date(r.createdAt).toLocaleDateString()}</Text>
+                      <Text className="text-gray-600 text-xs leading-5 mt-1">{r.reviewText || r.comment}</Text>
                     </View>
-                    <Text className="text-gray-600 text-xs leading-5 mt-1">{r.reviewText || r.comment}</Text>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             ) : (
               <View className="bg-gray-50 p-6 rounded-[24px] items-center">

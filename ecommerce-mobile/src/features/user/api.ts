@@ -13,6 +13,11 @@ export const userApi = {
     return response.data;
   },
 
+  getUserById: async (id: string) => {
+    const response = await apiClient.get<any>(`/users/${id}`);
+    return response.data;
+  },
+
   updateProfile: async (payload: UserProfileUpdate) => {
     const response = await apiClient.put<any>('/users/profile', payload);
     return response.data;
