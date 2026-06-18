@@ -404,12 +404,12 @@ const ProductDetailScreen = ({ route, navigation }: any) => {
               
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mr-[-20px]">
                 {recommendations.map((p, idx) => (
-                  <View key={p.id || `rec-${idx}`} className="w-[160px] mr-4">
-                    <ProductCard 
-                      product={p} 
-                      onPress={(prod) => navigation.push('ProductDetail', { productId: prod.id })} 
-                    />
-                  </View>
+                  <ProductCard 
+                    key={p.id || `rec-${idx}`}
+                    product={p} 
+                    onPress={(prod) => navigation.push('ProductDetail', { productId: prod.id })} 
+                    containerStyle="w-[150px] mr-4"
+                  />
                 ))}
               </ScrollView>
             </View>

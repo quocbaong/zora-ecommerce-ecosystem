@@ -69,8 +69,12 @@ const SearchFilterScreen = ({ navigation, route }: any) => {
       };
       if (keyword) params.keyword = keyword;
       if (categoryId) params.categoryId = categoryId;
-      if (minPrice) params.minPrice = Number(minPrice);
-      if (maxPrice) params.maxPrice = Number(maxPrice);
+      
+      const parsedMin = minPrice ? Number(minPrice.replace(/\D/g, '')) : null;
+      const parsedMax = maxPrice ? Number(maxPrice.replace(/\D/g, '')) : null;
+
+      if (parsedMin && parsedMin > 0) params.minPrice = parsedMin;
+      if (parsedMax && parsedMax > 0) params.maxPrice = parsedMax;
       if (rating) params.rating = rating;
 
       const res = await productApi.getProducts(params);

@@ -6,9 +6,10 @@ import { Product } from '../types';
 interface ProductCardProps {
   product: Product;
   onPress: (product: Product) => void;
+  containerStyle?: string;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onPress }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onPress, containerStyle = 'w-[48%]' }) => {
   const discount = product.discountPercent || 0;
   const originalPrice = product.price / (1 - discount / 100);
   
@@ -16,7 +17,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onPress }) => {
     <TouchableOpacity 
       onPress={() => onPress(product)}
       activeOpacity={0.8}
-      className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 mb-4 w-[48%]"
+      className={`bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 mb-4 ${containerStyle}`}
       style={{ 
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
