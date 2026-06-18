@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { 
   View, 
   Text, 
@@ -21,10 +22,9 @@ const StatusBadge = ({ status }: { status: string }) => {
     SHIPPING: { color: '#a855f7', bg: '#f3e8ff', icon: Truck, label: 'Đang giao' },
     DELIVERED: { color: '#22c55e', bg: '#f0fdf4', icon: CheckCircle, label: 'Đã giao' },
     CANCELLED: { color: COLORS.error, bg: '#fef2f2', icon: XCircle, label: 'Đã hủy' },
+    REFUNDED: { color: '#eab308', bg: '#fefce8', icon: CheckCircle, label: 'Đã hoàn tiền' },
+    DISPUTED: { color: '#eab308', bg: '#fefce8', icon: AlertTriangle, label: 'Đang khiếu nại' },
     REFUND_REQUESTED: { color: '#eab308', bg: '#fefce8', icon: AlertTriangle, label: 'Đang khiếu nại' },
-    REFUND_APPROVED: { color: '#eab308', bg: '#fefce8', icon: CheckCircle, label: 'Chấp nhận trả hàng' },
-    REFUND_REJECTED: { color: COLORS.error, bg: '#fef2f2', icon: XCircle, label: 'Từ chối trả hàng' },
-    CLOSED: { color: '#9ca3af', bg: '#f3f4f6', icon: CheckCircle, label: 'Đóng' }
   };
 
   const config = configs[status] || configs.PENDING;
@@ -64,9 +64,11 @@ const OrdersScreen = ({ navigation }: any) => {
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { notificationApi } from '../features/notification/api';
+import apiClient from '../api/client';
 import { Notification } from '../types';
 
 interface NotificationState {
@@ -7,6 +8,7 @@ interface NotificationState {
   unreadCount: number;
   fetchNotifications: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
   receiveNotification: (notification: Notification) => void;
 }
 
@@ -16,9 +18,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   
   fetchNotifications: async () => {
     try {
-      const data = await notificationApi.getNotifications();
-      const notifs = data || [];
-      const unreadCount = notifs.filter((n: Notification) => !n.isRead).length;
+      const response = await apiClient.get<any>('/notifications');
+      const notifs = response.data?.data || response.data?.content || [];
+      const unreadCount = response.data?.unreadCount !== undefined ? response.data.unreadCount : notifs.filter((n: Notification) => !n.isRead).length;
       set({ notifications: notifs, unreadCount });
     } catch (error) {
       console.error('Failed to fetch notifications in store', error);
@@ -35,6 +37,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
     } catch (error) {
       console.error('Failed to mark notification as read in store', error);
+    }
+  },
+
+  markAllAsRead: async () => {
+    try {
+      await notificationApi.markAllAsRead();
+      set((state) => {
+        const notifs = state.notifications.map(n => ({ ...n, isRead: true }));
+        return { notifications: notifs, unreadCount: 0 };
+      });
+    } catch (error) {
+      console.error('Failed to mark all as read in store', error);
     }
   },
 

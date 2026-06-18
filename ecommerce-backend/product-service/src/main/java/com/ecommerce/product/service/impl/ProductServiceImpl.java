@@ -503,9 +503,6 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại!"));
 
         String reviewText = request.getReviewText() != null ? request.getReviewText().trim() : "";
-        if (reviewText.isEmpty()) {
-            throw new RuntimeException("Nội dung nhận xét không được bỏ trống");
-        }
 
         // Tạo Entity Nhận xét
         com.ecommerce.product.entity.ProductReview review = com.ecommerce.product.entity.ProductReview.builder()
@@ -514,6 +511,19 @@ public class ProductServiceImpl implements ProductService {
                 .rating(request.getRating())
                 .reviewText(reviewText)
                 .build();
+                
+        // Xử lý hình ảnh (nếu có)
+        if (request.getImageUrls() != null && !request.getImageUrls().isEmpty()) {
+            java.util.List<com.ecommerce.product.entity.ReviewImage> images = new java.util.ArrayList<>();
+            for (String url : request.getImageUrls()) {
+                com.ecommerce.product.entity.ReviewImage img = new com.ecommerce.product.entity.ReviewImage();
+                img.setImageUrl(url);
+                img.setReview(review);
+                images.add(img);
+            }
+            review.setReviewImages(images);
+        }
+        
         productReviewRepository.save(review);
 
         // Tự động tính toán lại Điểm trung bình (Rating Average) cho toàn bộ sản phẩm

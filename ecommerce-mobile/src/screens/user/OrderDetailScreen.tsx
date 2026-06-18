@@ -5,8 +5,11 @@ import {
   ScrollView, 
   TouchableOpacity, 
   ActivityIndicator,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   ChevronLeft, 
@@ -29,10 +32,9 @@ const StatusBadge = ({ status }: { status: string }) => {
     SHIPPING: { color: '#a855f7', bg: '#f3e8ff', icon: Truck, label: 'Đang giao' },
     DELIVERED: { color: '#22c55e', bg: '#f0fdf4', icon: CheckCircle, label: 'Đã giao' },
     CANCELLED: { color: COLORS.error, bg: '#fef2f2', icon: XCircle, label: 'Đã hủy' },
+    REFUNDED: { color: '#eab308', bg: '#fefce8', icon: CheckCircle, label: 'Đã hoàn tiền' },
+    DISPUTED: { color: '#eab308', bg: '#fefce8', icon: AlertTriangle, label: 'Đang khiếu nại' },
     REFUND_REQUESTED: { color: '#eab308', bg: '#fefce8', icon: AlertTriangle, label: 'Đang khiếu nại' },
-    REFUND_APPROVED: { color: '#eab308', bg: '#fefce8', icon: CheckCircle, label: 'Chấp nhận trả hàng' },
-    REFUND_REJECTED: { color: COLORS.error, bg: '#fef2f2', icon: XCircle, label: 'Từ chối trả hàng' },
-    CLOSED: { color: '#9ca3af', bg: '#f3f4f6', icon: CheckCircle, label: 'Đóng' }
   };
 
   const config = configs[status] || configs.PENDING;
@@ -51,6 +53,16 @@ export default function OrderDetailScreen({ route, navigation }: any) {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [reviewedOrders, setReviewedOrders] = useState<Record<string, boolean>>({});
+
+  useFocusEffect(
+    React.useCallback(() => {
+      AsyncStorage.getItem('reviewed_orders').then((res) => {
+        if (res) setReviewedOrders(JSON.parse(res));
+      });
+    }, [])
+  );
 
   const fetchOrderDetail = async () => {
     try {
@@ -67,28 +79,28 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   useEffect(() => {
     fetchOrderDetail();
-  }, [orderId]);
+    let interval: NodeJS.Timeout;
+    const activeStates = ['PENDING', 'CONFIRMED', 'SHIPPING'];
+    if (!order || activeStates.includes(order.status)) {
+      interval = setInterval(() => {
+        fetchOrderDetail();
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [orderId, order?.status]);
 
-  const handleCancelOrder = () => {
-    Alert.alert('Hủy đơn hàng', 'Bạn có chắc chắn muốn hủy đơn hàng này?', [
-      { text: 'Không', style: 'cancel' },
-      { 
-        text: 'Có, Hủy đơn', 
-        style: 'destructive',
-        onPress: async () => {
-          setProcessing(true);
-          try {
-            await orderApi.cancelOrder(orderId);
-            Alert.alert('Thành công', 'Đã hủy đơn hàng');
-            fetchOrderDetail();
-          } catch (error) {
-            Alert.alert('Lỗi', 'Không thể hủy đơn hàng lúc này.');
-          } finally {
-            setProcessing(false);
-          }
-        }
-      }
-    ]);
+  const handleCancelOrder = async () => {
+    setShowCancelModal(false);
+    setProcessing(true);
+    try {
+      await orderApi.cancelOrder(orderId);
+      Alert.alert('Thành công', 'Đã hủy đơn hàng');
+      fetchOrderDetail();
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể hủy đơn hàng lúc này.');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleConfirmReceived = () => {
@@ -122,10 +134,10 @@ export default function OrderDetailScreen({ route, navigation }: any) {
 
   // Mock tracking timeline
   const trackingTimeline = [
-    { title: 'Đơn hàng đã đặt', time: new Date(order.createdAt).toLocaleString('vi-VN'), completed: true },
-    { title: 'Người bán đã chuẩn bị hàng', time: 'Đang cập nhật', completed: order.status !== 'PENDING' && order.status !== 'CANCELLED' },
-    { title: 'Đang giao hàng (Tài xế: Nguyễn Văn A - 0901234567)', time: 'Đang cập nhật', completed: order.status === 'SHIPPING' || order.status === 'DELIVERED' },
-    { title: 'Giao hàng thành công', time: order.status === 'DELIVERED' ? 'Đã hoàn thành' : 'Chờ giao hàng', completed: order.status === 'DELIVERED' },
+    { title: 'Đơn hàng đã đặt', time: new Date(order.createdAt).toLocaleString('vi-VN'), completed: true, icon: Package },
+    { title: 'Người bán đã chuẩn bị hàng', time: 'Đang cập nhật', completed: order.status !== 'PENDING' && order.status !== 'CANCELLED', icon: Package },
+    { title: 'Đang giao hàng', time: 'Tài xế Nguyễn Văn A đang giao', completed: order.status === 'SHIPPING' || order.status === 'DELIVERED', icon: Truck },
+    { title: 'Giao hàng thành công', time: order.status === 'DELIVERED' ? 'Đã hoàn thành' : 'Chờ giao hàng', completed: order.status === 'DELIVERED', icon: CheckCircle },
   ];
 
   return (
@@ -147,20 +159,25 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         {(order.status !== 'CANCELLED' && !order.status.includes('REFUND')) && (
           <View className="bg-white p-6 mb-2 border-b border-gray-100">
             <Text className="text-secondary font-bold text-base tracking-tight mb-4">Lịch trình giao hàng</Text>
-            {trackingTimeline.map((step, idx) => (
-              <View key={idx} className="flex-row mb-4">
-                <View className="items-center mr-4">
-                  <View className={`w-4 h-4 rounded-full border-2 ${step.completed ? 'bg-primary border-primary' : 'bg-white border-gray-300'}`} />
-                  {idx < trackingTimeline.length - 1 && (
-                    <View className={`w-[2px] h-10 ${trackingTimeline[idx + 1].completed ? 'bg-primary' : 'bg-gray-200'} mt-1`} />
-                  )}
+            {trackingTimeline.map((step, idx) => {
+              const StepIcon = step.icon;
+              return (
+                <View key={idx} className="flex-row mb-4">
+                  <View className="items-center mr-4">
+                    <View className={`w-8 h-8 rounded-full border items-center justify-center ${step.completed ? 'bg-orange-50 border-primary' : 'bg-white border-gray-200'}`}>
+                      <StepIcon size={14} color={step.completed ? COLORS.primary : '#d1d5db'} />
+                    </View>
+                    {idx < trackingTimeline.length - 1 && (
+                      <View className={`w-[2px] h-10 ${trackingTimeline[idx + 1].completed ? 'bg-primary' : 'bg-gray-200'} mt-1`} />
+                    )}
+                  </View>
+                  <View className="flex-1 justify-center mt-[-6px]">
+                    <Text className={`font-bold text-sm ${step.completed ? 'text-secondary' : 'text-gray-400'}`}>{step.title}</Text>
+                    <Text className="text-gray-400 text-[10px] mt-0.5">{step.time}</Text>
+                  </View>
                 </View>
-                <View className="flex-1 mt-[-2px]">
-                  <Text className={`font-bold text-sm ${step.completed ? 'text-secondary' : 'text-gray-400'}`}>{step.title}</Text>
-                  <Text className="text-gray-400 text-[10px] mt-0.5">{step.time}</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -226,11 +243,12 @@ export default function OrderDetailScreen({ route, navigation }: any) {
       <View className="bg-white p-4 pt-4 pb-8 border-t border-gray-100 shadow-2xl flex-row justify-end space-x-3">
         {order.status === 'PENDING' && (
           <TouchableOpacity 
-            onPress={handleCancelOrder}
+            onPress={() => setShowCancelModal(true)}
             disabled={processing}
-            className="px-6 py-3 rounded-2xl border border-gray-200 bg-white"
+            className="px-6 py-3 rounded-2xl bg-red-50 border border-red-200 flex-row items-center mr-3"
           >
-            <Text className="text-gray-500 font-bold">Hủy đơn</Text>
+            <XCircle size={16} color="#ef4444" className="mr-2" />
+            <Text className="text-red-500 font-bold">Hủy đơn</Text>
           </TouchableOpacity>
         )}
         {(order.status === 'SHIPPING' || order.status === 'DELIVERED') && (
@@ -245,13 +263,15 @@ export default function OrderDetailScreen({ route, navigation }: any) {
         )}
         {order.status === 'DELIVERED' && (
           <>
-            <TouchableOpacity 
-              onPress={() => navigation.navigate('ReviewForm', { orderId: order.id, items: order.items })}
-              className="px-4 py-3 rounded-2xl bg-orange-50 border border-orange-200 flex-row items-center mr-3"
-            >
-              <MessageSquare size={16} color={COLORS.primary} className="mr-2" />
-              <Text className="text-primary font-bold text-xs">Đánh giá</Text>
-            </TouchableOpacity>
+            {!reviewedOrders[order.id] && (
+              <TouchableOpacity 
+                onPress={() => navigation.navigate('ReviewForm', { orderId: order.id, items: order.items })}
+                className="px-4 py-3 rounded-2xl bg-orange-50 border border-orange-200 flex-row items-center mr-3"
+              >
+                <MessageSquare size={16} color={COLORS.primary} className="mr-2" />
+                <Text className="text-primary font-bold text-xs">Đánh giá</Text>
+              </TouchableOpacity>
+            )}
             
             <TouchableOpacity 
               onPress={() => navigation.navigate('DisputeForm', { orderId: order.id })}
@@ -263,6 +283,26 @@ export default function OrderDetailScreen({ route, navigation }: any) {
           </>
         )}
       </View>
+
+      <Modal visible={showCancelModal} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center px-6">
+          <View className="bg-white w-full rounded-3xl p-6 items-center">
+            <View className="w-16 h-16 bg-red-50 rounded-full items-center justify-center mb-4">
+              <XCircle size={32} color="#ef4444" />
+            </View>
+            <Text className="text-secondary font-bold text-xl mb-2 text-center">Xác nhận hủy đơn?</Text>
+            <Text className="text-gray-500 text-sm text-center mb-6 leading-5">Đơn hàng này sẽ bị hủy ngay lập tức và không thể khôi phục. Bạn có chắc chắn không?</Text>
+            <View className="flex-row w-full space-x-3">
+              <TouchableOpacity onPress={() => setShowCancelModal(false)} className="flex-1 bg-gray-100 py-4 rounded-2xl items-center mr-2">
+                <Text className="text-secondary font-bold">Giữ lại</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleCancelOrder} className="flex-1 bg-red-500 py-4 rounded-2xl items-center ml-2">
+                <Text className="text-white font-bold">Chắc chắn Hủy</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

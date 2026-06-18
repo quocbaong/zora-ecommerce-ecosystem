@@ -63,9 +63,21 @@ export default function AddressListScreen({ route, navigation }: any) {
 
   const handleSelect = (item: any) => {
     if (isSelectionMode) {
-      navigation.navigate('Checkout', { selectedAddress: item });
+      navigation.navigate({
+        name: 'Checkout',
+        params: { selectedAddress: item, selectedItemIds: route.params?.selectedItemIds },
+        merge: true,
+      });
     }
   };
+
+  const sortedAddresses = [...addresses].sort((a, b) => {
+    const aDef = a.default || a.isDefault;
+    const bDef = b.default || b.isDefault;
+    if (aDef && !bDef) return -1;
+    if (!aDef && bDef) return 1;
+    return 0;
+  });
 
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
@@ -80,7 +92,7 @@ export default function AddressListScreen({ route, navigation }: any) {
         <View className="flex-1">
           <View className="flex-row justify-between items-center mb-1">
             <Text className="text-secondary font-bold text-base tracking-tight">{item.receiverName || item.fullName}</Text>
-            {item.default && (
+            {(item.default || item.isDefault) && (
                <View className="bg-green-50 px-2 py-1 rounded-lg">
                   <Text className="text-green-600 text-[8px] font-bold uppercase">Mặc định</Text>
                </View>
@@ -109,7 +121,7 @@ export default function AddressListScreen({ route, navigation }: any) {
             </TouchableOpacity>
          </View>
          
-         {!item.default && (
+         {!(item.default || item.isDefault) && (
             <TouchableOpacity className="bg-secondary px-4 py-2 rounded-xl">
                <Text className="text-white font-bold text-[10px]">Đặt mặc định</Text>
             </TouchableOpacity>
@@ -127,7 +139,7 @@ export default function AddressListScreen({ route, navigation }: any) {
              <Text className="text-gray-400 font-medium text-xs mt-1">Nơi nhận hàng của bạn</Text>
            </View>
            <TouchableOpacity 
-              onPress={() => navigation.navigate('AddAddress')}
+              onPress={() => navigation.navigate('AddressForm')}
               className="bg-primary p-3 rounded-2xl shadow-lg shadow-orange-500/20"
             >
               <Plus size={20} color="#fff" />
@@ -140,7 +152,7 @@ export default function AddressListScreen({ route, navigation }: any) {
           </View>
         ) : (
           <FlatList
-            data={addresses}
+            data={sortedAddresses}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
@@ -154,7 +166,7 @@ export default function AddressListScreen({ route, navigation }: any) {
                 <Text className="text-secondary font-bold text-xl tracking-tight">Chưa có địa chỉ nào</Text>
                 <Text className="text-gray-400 mt-2 font-medium text-center px-10 leading-5">Vui lòng thêm địa chỉ nhận hàng để ZORA có thể phục vụ bạn tốt nhất!</Text>
                 <TouchableOpacity 
-                  onPress={() => navigation.navigate('AddAddress')}
+                  onPress={() => navigation.navigate('AddressForm')}
                   className="mt-8 bg-primary px-8 py-3 rounded-2xl shadow-lg shadow-orange-500/20"
                 >
                    <Text className="text-white font-bold uppercase tracking-widest text-xs">Thêm địa chỉ mới</Text>

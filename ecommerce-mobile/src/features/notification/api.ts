@@ -3,12 +3,17 @@ import { ApiResponse, Notification } from '../../types';
 
 export const notificationApi = {
   getNotifications: async () => {
-    const response = await apiClient.get<Notification[]>('/notifications');
-    return response.data;
+    const response = await apiClient.get<any>('/notifications');
+    return response.data?.data || response.data?.content || [];
   },
 
   markAsRead: async (id: string) => {
-    const response = await apiClient.patch<ApiResponse<any>>(`/notifications/${id}/read`);
+    const response = await apiClient.put<ApiResponse<any>>(`/notifications/${id}/read`);
+    return response.data;
+  },
+
+  markAllAsRead: async () => {
+    const response = await apiClient.put<ApiResponse<any>>('/notifications/read-all');
     return response.data;
   },
 };

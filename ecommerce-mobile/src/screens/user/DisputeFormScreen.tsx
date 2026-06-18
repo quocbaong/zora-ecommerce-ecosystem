@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Camera, AlertTriangle } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { orderApi } from '../../features/order/api';
+import apiClient from '../../api/client';
 import { COLORS } from '../../constants';
 
 export default function DisputeFormScreen({ route, navigation }: any) {
@@ -32,7 +33,7 @@ export default function DisputeFormScreen({ route, navigation }: any) {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -50,7 +51,18 @@ export default function DisputeFormScreen({ route, navigation }: any) {
     try {
       let imageUrl = null;
       if (imageUri) {
-        imageUrl = imageUri; // Mock upload
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'evidence.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        let ext = match ? match[1].toLowerCase() : 'jpeg';
+        if (ext === 'jpg') ext = 'jpeg';
+        const type = `image/${ext}`;
+
+        formData.append('file', { uri: imageUri, name: filename, type } as any);
+        const uploadRes = await apiClient.post('/chat/upload', formData, { 
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        imageUrl = uploadRes.data.url;
       }
 
       await orderApi.requestDispute(orderId, {
@@ -62,9 +74,10 @@ export default function DisputeFormScreen({ route, navigation }: any) {
       Alert.alert('Thành công', 'Yêu cầu trả hàng / Hoàn tiền đã được gửi. Chúng tôi sẽ xử lý sớm nhất.', [
         { text: 'OK', onPress: () => navigation.navigate('Orders') }
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Lỗi', 'Không thể gửi yêu cầu khiếu nại lúc này.');
+      const backendError = error.response?.data?.message || error.response?.data?.error || 'Không thể gửi yêu cầu lúc này.';
+      Alert.alert('Lỗi', backendError);
     } finally {
       setLoading(false);
     }
@@ -134,9 +147,14 @@ export default function DisputeFormScreen({ route, navigation }: any) {
         <TouchableOpacity 
           onPress={submitDispute}
           disabled={loading}
-          className="bg-red-500 py-4 rounded-3xl items-center shadow-xl shadow-red-500/30"
+          className="bg-red-500 py-4 rounded-3xl items-center shadow-xl shadow-red-500/30 flex-row justify-center"
         >
-          {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-base uppercase">Gửi Yêu Cầu</Text>}
+          {loading ? <ActivityIndicator color="white" /> : (
+            <>
+              <AlertTriangle size={20} color="white" className="mr-2" />
+              <Text className="text-white font-bold text-base uppercase">Gửi Yêu Cầu Hoàn Tiền</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

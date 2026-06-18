@@ -9,11 +9,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Switch
+  Switch,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Save, MapPin, User, Phone, CheckCircle2 } from 'lucide-react-native';
 import { userApi } from '../../features/user/api';
+import apiClient from '../../api/client';
 import { COLORS } from '../../constants';
 
 export default function AddressFormScreen({ route, navigation }: any) {
@@ -26,9 +28,43 @@ export default function AddressFormScreen({ route, navigation }: any) {
   const [ward, setWard] = useState(address?.ward || '');
   const [district, setDistrict] = useState(address?.district || '');
   const [province, setProvince] = useState(address?.province || '');
-  const [isDefault, setIsDefault] = useState(address?.isDefault || false);
+  const [isDefault, setIsDefault] = useState(address?.default || address?.isDefault || false);
   const [type, setType] = useState(address?.type || 'HOME');
   const [loading, setLoading] = useState(false);
+
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [wards, setWards] = useState<any[]>([]);
+
+  const [provinceId, setProvinceId] = useState<number | undefined>(address?.ghnProvinceId);
+  const [districtId, setDistrictId] = useState<number | undefined>(address?.ghnDistrictId);
+  const [wardCode, setWardCode] = useState<string | undefined>(address?.ghnWardCode);
+
+  useEffect(() => {
+    apiClient.get('/shipping/provinces').then(res => {
+      setProvinces(res.data?.data || res.data || []);
+    }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (provinceId) {
+      apiClient.get(`/shipping/districts/${provinceId}`).then(res => {
+        setDistricts(res.data?.data || res.data || []);
+      }).catch(console.error);
+    } else {
+      setDistricts([]);
+    }
+  }, [provinceId]);
+
+  useEffect(() => {
+    if (districtId) {
+      apiClient.get(`/shipping/wards/${districtId}`).then(res => {
+        setWards(res.data?.data || res.data || []);
+      }).catch(console.error);
+    } else {
+      setWards([]);
+    }
+  }, [districtId]);
 
   const handleSave = async () => {
     if (!fullName || !phoneNumber || !street || !ward || !district || !province) {
@@ -44,8 +80,11 @@ export default function AddressFormScreen({ route, navigation }: any) {
       ward,
       district,
       province,
-      isDefault,
-      type
+      default: isDefault,
+      type,
+      ghnProvinceId: provinceId,
+      ghnDistrictId: districtId,
+      ghnWardCode: wardCode
     };
 
     try {
@@ -103,9 +142,51 @@ export default function AddressFormScreen({ route, navigation }: any) {
                  <Text className="text-secondary font-bold text-xs uppercase tracking-widest">Địa chỉ chi tiết</Text>
               </View>
 
-              <FormInput label="Tỉnh / Thành phố" value={province} onChange={setProvince} icon={<MapPin size={18} color="#9ca3af" />} placeholder="Hà Nội" />
-              <FormInput label="Quận / Huyện" value={district} onChange={setDistrict} icon={<MapPin size={18} color="#9ca3af" />} placeholder="Cầu Giấy" />
-              <FormInput label="Phường / Xã" value={ward} onChange={setWard} icon={<MapPin size={18} color="#9ca3af" />} placeholder="Dịch Vọng Hậu" />
+              <DropdownInput 
+                label="Tỉnh / Thành phố" 
+                value={province} 
+                options={provinces}
+                keyExtractor={(item: any) => item.provinceId.toString()}
+                labelExtractor={(item: any) => item.provinceName}
+                onSelect={(item: any) => {
+                  setProvince(item.provinceName);
+                  setProvinceId(item.provinceId);
+                  setDistrict('');
+                  setDistrictId(undefined);
+                  setWard('');
+                  setWardCode(undefined);
+                }} 
+                icon={<MapPin size={18} color="#9ca3af" />} 
+                placeholder="Chọn Tỉnh/Thành phố" 
+              />
+              <DropdownInput 
+                label="Quận / Huyện" 
+                value={district} 
+                options={districts}
+                keyExtractor={(item: any) => item.districtId.toString()}
+                labelExtractor={(item: any) => item.districtName}
+                onSelect={(item: any) => {
+                  setDistrict(item.districtName);
+                  setDistrictId(item.districtId);
+                  setWard('');
+                  setWardCode(undefined);
+                }} 
+                icon={<MapPin size={18} color="#9ca3af" />} 
+                placeholder="Chọn Quận/Huyện" 
+              />
+              <DropdownInput 
+                label="Phường / Xã" 
+                value={ward} 
+                options={wards}
+                keyExtractor={(item: any) => item.wardCode}
+                labelExtractor={(item: any) => item.wardName}
+                onSelect={(item: any) => {
+                  setWard(item.wardName);
+                  setWardCode(item.wardCode);
+                }} 
+                icon={<MapPin size={18} color="#9ca3af" />} 
+                placeholder="Chọn Phường/Xã" 
+              />
               <FormInput label="Địa chỉ cụ thể (Số nhà, tên đường)" value={street} onChange={setStreet} icon={<MapPin size={18} color="#9ca3af" />} placeholder="Số 123, Đường Láng" />
             </View>
 
@@ -171,6 +252,66 @@ function FormInput({ label, value, onChange, icon, placeholder, keyboardType = '
           keyboardType={keyboardType}
         />
       </View>
+    </View>
+  );
+}
+
+function DropdownInput({ label, value, options, onSelect, icon, placeholder, keyExtractor, labelExtractor }: any) {
+  const [visible, setVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const filteredOptions = options.filter((opt: any) => 
+    labelExtractor(opt).toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <View className="mt-6">
+      <Text className="text-secondary font-bold mb-3 ml-1 text-[10px] uppercase tracking-widest">{label}</Text>
+      <TouchableOpacity 
+        onPress={() => { setVisible(true); setSearchQuery(''); }}
+        className="flex-row items-center bg-gray-50 border border-gray-100 rounded-[20px] px-5 py-4"
+      >
+        {icon}
+        <Text className={`flex-1 ml-4 text-sm font-bold ${value ? 'text-secondary' : 'text-gray-400'}`}>
+          {value || placeholder}
+        </Text>
+      </TouchableOpacity>
+      <Modal visible={visible} animationType="fade" transparent>
+        <TouchableOpacity activeOpacity={1} onPress={() => setVisible(false)} className="flex-1 bg-black/40 justify-end items-center">
+          <View className="bg-white w-full rounded-t-3xl h-[70%] p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="font-bold text-lg text-secondary">Chọn {label.toLowerCase()}</Text>
+              <TouchableOpacity onPress={() => setVisible(false)}><Text className="text-primary font-bold">Đóng</Text></TouchableOpacity>
+            </View>
+            <TextInput 
+              placeholder="Nhập để tìm kiếm..."
+              placeholderTextColor="#9ca3af"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              className="bg-gray-50 border border-gray-100 px-4 py-3 rounded-xl mb-4 text-secondary font-medium"
+            />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {filteredOptions.map((opt: any) => (
+                <TouchableOpacity 
+                  key={keyExtractor(opt)}
+                  onPress={() => { onSelect(opt); setVisible(false); }}
+                  className="py-4 border-b border-gray-100"
+                >
+                  <Text className={`font-medium ${value === labelExtractor(opt) ? 'text-primary' : 'text-secondary'}`}>
+                    {labelExtractor(opt)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {filteredOptions.length === 0 && options.length > 0 && (
+                <Text className="text-center text-gray-400 mt-4">Không tìm thấy kết quả phù hợp</Text>
+              )}
+              {options.length === 0 && (
+                <Text className="text-center text-gray-400 mt-4">Vui lòng chọn mục phía trên trước</Text>
+              )}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
