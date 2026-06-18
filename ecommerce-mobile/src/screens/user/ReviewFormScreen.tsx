@@ -14,6 +14,7 @@ import { ChevronLeft, Star, Camera, UploadCloud } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../constants';
 import apiClient from '../../api/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ReviewFormScreen({ route, navigation }: any) {
   const { orderId, items } = route.params;
@@ -26,7 +27,7 @@ export default function ReviewFormScreen({ route, navigation }: any) {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -36,36 +37,45 @@ export default function ReviewFormScreen({ route, navigation }: any) {
   };
 
   const submitReview = async () => {
-    if (!comment) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập nhận xét của bạn');
-      return;
-    }
     setLoading(true);
     try {
       let imageUrl = null;
       if (imageUri) {
-        // Mock S3 upload logic
-        // let formData = new FormData();
-        // formData.append('file', { uri: imageUri, name: 'review.jpg', type: 'image/jpeg' } as any);
-        // const uploadRes = await apiClient.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' }});
-        // imageUrl = uploadRes.data.url;
-        imageUrl = imageUri; // Mock
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'review.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        let ext = match ? match[1].toLowerCase() : 'jpeg';
+        if (ext === 'jpg') ext = 'jpeg';
+        const type = `image/${ext}`;
+
+        formData.append('file', { uri: imageUri, name: filename, type } as any);
+        const uploadRes = await apiClient.post('/chat/upload', formData, { 
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        imageUrl = uploadRes.data.url;
       }
 
-      await apiClient.post('/reviews', {
-        productId: item.productId,
-        orderId,
+      const finalComment = comment.trim() || `Đánh giá ${rating} sao`;
+      const targetProductId = item.productId || item.product?.id || item.id;
+
+      await apiClient.post(`/products/${targetProductId}/reviews`, {
         rating,
-        comment,
-        images: imageUrl ? [imageUrl] : []
+        reviewText: finalComment,
+        imageUrls: imageUrl ? [imageUrl] : []
       });
+
+      const stored = await AsyncStorage.getItem('reviewed_orders');
+      const reviewed = stored ? JSON.parse(stored) : {};
+      reviewed[orderId] = true;
+      await AsyncStorage.setItem('reviewed_orders', JSON.stringify(reviewed));
 
       Alert.alert('Thành công', 'Đánh giá của bạn đã được gửi!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Lỗi', 'Không thể gửi đánh giá.');
+      const backendError = error.response?.data?.message || error.response?.data?.error || 'Không thể gửi đánh giá lúc này.';
+      Alert.alert('Lỗi', backendError);
     } finally {
       setLoading(false);
     }

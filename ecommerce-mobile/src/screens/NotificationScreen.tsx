@@ -6,7 +6,8 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   RefreshControl,
-  ScrollView
+  ScrollView,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
@@ -53,7 +54,7 @@ const TABS = [
 ];
 
 const NotificationScreen = ({ navigation }: any) => {
-  const { notifications, fetchNotifications, markAsRead } = useNotificationStore();
+  const { notifications, fetchNotifications, markAsRead, markAllAsRead } = useNotificationStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('ALL');
@@ -116,7 +117,10 @@ const NotificationScreen = ({ navigation }: any) => {
              <Text className="text-gray-400 font-medium text-xs mt-1">Tin mới từ hệ thống ZORA</Text>
            </View>
            <View className="flex-row gap-2">
-              <TouchableOpacity className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+              <TouchableOpacity 
+                onPress={() => markAllAsRead()}
+                className="bg-gray-50 p-3 rounded-2xl border border-gray-100"
+              >
                 <CheckCircle2 size={20} color="#9ca3af" />
               </TouchableOpacity>
               <TouchableOpacity className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
