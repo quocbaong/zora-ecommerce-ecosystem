@@ -158,14 +158,14 @@ const HomeScreen = ({ navigation }: any) => {
           className="px-4"
           contentContainerStyle={{ paddingRight: 32 }}
         >
-          <View className="flex-row flex-wrap w-[800px] h-[240px]">
+          <View className="flex-row gap-4">
             {(categories.length > 0 ? categories : CATEGORIES).map((c) => (
               <TouchableOpacity 
                 key={c.id} 
                 onPress={() => navigation.navigate('SearchFilter', { categoryId: c.id })}
-                className="w-28 h-28 bg-white m-1.5 rounded-3xl overflow-hidden border border-gray-100 shadow-sm items-center justify-center"
+                className="w-24 h-28 bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm items-center justify-center"
               >
-                <View className="w-14 h-14 rounded-full overflow-hidden mb-2 bg-gray-50">
+                <View className="w-12 h-12 rounded-full overflow-hidden mb-2 bg-gray-50">
                   <Image source={c.image || getCategoryImage(c.name)} className="w-full h-full" resizeMode="cover" />
                 </View>
                 <Text className="text-secondary font-bold text-[9px] text-center px-2" numberOfLines={2}>
