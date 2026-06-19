@@ -9,7 +9,7 @@ ZORA is a comprehensive, distributed e-commerce platform designed for high perfo
 ## 📥 Live Demo & Application
 
 - 🌐 **Web Storefront:** [https://zora-ecommerce-ecosystem.vercel.app](https://zora-ecommerce-ecosystem.vercel.app)
-- 📱 **Mobile App (Android APK):** [Link_Download_APK_Here](#) *(Currently building via Expo EAS...)*
+- 📱 **Mobile App (Android APK):** [Download Latest Version](https://github.com/quocbaong/zora-ecommerce-ecosystem/releases/latest)
 
 ---
 
